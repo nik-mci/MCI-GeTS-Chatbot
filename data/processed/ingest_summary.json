@@ -1,0 +1,14 @@
+{
+  "total_documents": 6451,
+  "website_chunks": 2223,
+  "intelliticks_docs": 5267,
+  "pages_by_type": {
+    "general": 207,
+    "about": 4,
+    "contact": 1,
+    "tour_package": 54,
+    "blog": 214
+  },
+  "embedding_model": "all-MiniLM-L6-v2",
+  "built_at": "2026-03-25T17:11:33.351288"
+}

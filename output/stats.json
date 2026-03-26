@@ -1,0 +1,19 @@
+{
+  "pipeline_config": {
+    "remove_urls": false,
+    "min_words_threshold": 5,
+    "max_chunk_words": 350
+  },
+  "ingestion": {
+    "total_raw_conversations": 16838,
+    "filtered_noise_conversations": 69,
+    "valid_conversations": 16769
+  },
+  "qa_extraction": {
+    "low_confidence": 1480,
+    "medium_confidence": 12152,
+    "high_confidence": 5294,
+    "total_pairs": 18926,
+    "deduplicated": 39856
+  }
+}
