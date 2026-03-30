@@ -1,6 +1,10 @@
+import sys
+import os
 import json
 import logging
 import re
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from utils.vector_db import get_vector_db
 from config import settings
 
@@ -140,6 +144,7 @@ def ingest_qa_pairs(overwrite: bool = True):
     texts = []
     metadatas = []
     
+    print("Preparing data for embedding...")
     logger.info("Preparing data for embedding...")
     total_count = len(data)
     filtered_count = 0
@@ -186,6 +191,7 @@ def ingest_qa_pairs(overwrite: bool = True):
         "keep_rate": f"{(kept_count/total_count)*100:.2f}%" if total_count > 0 else "0%"
     }
     
+    print(f"Ingestion Stats: {json.dumps(stats, indent=2)}")
     logger.info(f"Ingestion Stats: {json.dumps(stats, indent=2)}")
     
     if total_count > 0 and (kept_count / total_count) < 0.10:

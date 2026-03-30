@@ -65,9 +65,6 @@ async def chat_endpoint(request: ChatRequest):
     Execute Hybrid RAG execution loop combining retrieval parameters and explicit confidence tracking.
     """
     try:
-        if not settings.GEMINI_API_KEY:
-            raise HTTPException(status_code=500, detail="Missing GEMINI_API_KEY environment variable")
-
         start_time = datetime.utcnow()
         logger.info(f"[REQUEST] Query received: \"{request.query}\"")
 
@@ -216,10 +213,6 @@ async def chat_stream_endpoint(request: ChatRequest):
     """
     async def event_stream():
         try:
-            if not settings.GEMINI_API_KEY:
-                yield "data: [ERROR] Missing GEMINI_API_KEY\n\n"
-                return
-
             start_time = datetime.utcnow()
             logger.info(f"[REQUEST] Stream query received: \"{request.query}\"")
 

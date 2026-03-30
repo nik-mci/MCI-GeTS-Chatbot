@@ -21,6 +21,9 @@ dist/
 messages_dump.json
 data/raw/scraped_pages.json
 rag_api/faiss_index/
+*_backup/
+*.txt
+rag_api/rag_log.jsonl
 *.db
 *.sqlite3
 

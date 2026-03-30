@@ -1,18 +1,19 @@
-from groq import AsyncGroq
+import google.generativeai as genai
 import json
-from models.schemas import IntentExtraction
-from config import settings
 import logging
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
+from config import settings
 
 logger = logging.getLogger(__name__)
 
-# Configure Groq Client
-client = AsyncGroq(
-    api_key=settings.GROQ_API_KEY,
-)
+# Configure Gemini
+genai.configure(api_key=settings.GEMINI_API_KEY)
+
+from models.schemas import IntentExtraction
 
 async def extract_intent_and_entities(query: str, history: list = None) -> IntentExtraction:
-    """Uses LLM to extract structured travel entities and rebuilds a dense vector-optimized search string."""
+    """Uses Gemini to extract structured travel entities and rebuilds a dense vector-optimized search string."""
     
     system_prompt = """
     You are an intelligent query parser for a travel company chatbot retrieval engine.
@@ -28,21 +29,28 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
     Make it highly dense and descriptive ignoring conversational filler.
     Example Input: "I want a cheap bali trip" -> Output: "budget Bali tour packages with itinerary and pricing"
 
-    If a field is not present, set it to null (or empty array for destination). 
-    Return ONLY valid, parsable JSON matching the exact schema requirements containing `rewritten_query`.
+    Return ONLY valid, parsable JSON matching the schema.
     """
     
     try:
-        response = await client.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Conversation History:\n{history}\n\nLatest User Query: {query}"}
-            ],
-            temperature=0,
-            response_format={"type": "json_object"},
+        model = genai.GenerativeModel(
+            model_name=settings.GEMINI_MODEL,
+            system_instruction=system_prompt
         )
-        data = json.loads(response.choices[0].message.content)
+        
+        prompt = f"Conversation History:\n{history}\n\nLatest User Query: {query}"
+        
+        response = await model.generate_content_async(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0,
+                response_mime_type="application/json",
+            )
+        )
+        
+        data = json.loads(response.text)
+        
+        # Ensure it matches our IntentExtraction model
         extracted_intent = IntentExtraction(**data)
         
         # Fallback: Deterministic Destination Extraction if Gemini misses it
@@ -53,7 +61,8 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
                 logger.info(f"Fallback destination detection found: {extracted_intent.destination}")
         
         return extracted_intent
+
     except Exception as e:
         logger.error(f"Intent extraction failed: {e}")
         # Return fallback neutral intent and raw query if extraction fails entirely
-        return IntentExtraction(intent="general", rewritten_query=query)
+        return IntentExtraction(intent="general", rewritten_query=query, destination=[])

@@ -2,13 +2,13 @@ import faiss
 import numpy as np
 import json
 import os
-from typing import List, Dict, Any
 import pickle
-
-# We use sentence-transformers locally for 100% free embeddings as Deepseek focuses on chat completions.
-from sentence_transformers import SentenceTransformer
-
+import google.generativeai as genai
+from typing import List, Dict, Any
 from config import settings
+
+# Configure Gemini for Embeddings
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 class VectorDBBase:
     def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]]):
@@ -19,43 +19,76 @@ class VectorDBBase:
 class FAISSDB(VectorDBBase):
     def __init__(self):
         self.index_path = settings.FAISS_INDEX_PATH
-        self.dimension = 384  # Standard dense dimension for all-MiniLM-L6-v2
+        # Gemini Embedding Dimensions (gemini-embedding-2-preview is 3072)
+        self.dimension = 3072
         
-        # Free-tier fast local embeddings
-        self.encoder = SentenceTransformer("all-MiniLM-L6-v2")
+        # We use Gemini for embeddings to solve local memory pressure
+        self.embed_model = "models/gemini-embedding-2-preview"
         
-        self.index_file = f"{self.index_path}/index.faiss"
-        self.meta_file = f"{self.index_path}/metadata.pkl"
+        self.index_file = os.path.join(self.index_path, "index.faiss")
+        self.meta_file = os.path.join(self.index_path, "metadata.pkl")
         
         if os.path.exists(self.index_file) and os.path.exists(self.meta_file):
-            self.index = faiss.read_index(self.index_file)
-            with open(self.meta_file, 'rb') as f:
-                self.metadata = pickle.load(f)
+            try:
+                self.index = faiss.read_index(self.index_file)
+                with open(self.meta_file, 'rb') as f:
+                    self.metadata = pickle.load(f)
+                
+                # Check dimensions consistency
+                if self.index.d != self.dimension:
+                    print(f"Dimension mismatch! Old: {self.index.d}, New: {self.dimension}. Starting fresh index.")
+                    self._reset_index()
+            except Exception as e:
+                print(f"Error loading index: {e}. Starting fresh.")
+                self._reset_index()
         else:
-            self.index = faiss.IndexFlatIP(self.dimension)
-            self.metadata = []
+            self._reset_index()
+
+    def _reset_index(self):
+        self.index = faiss.IndexFlatIP(self.dimension)
+        self.metadata = []
 
     def get_embedding(self, text: str) -> List[float]:
-        emb = self.encoder.encode([text])[0]
-        return emb.tolist()
+        try:
+            result = genai.embed_content(
+                model=self.embed_model,
+                content=text,
+                task_type="retrieval_query"
+            )
+            return result['embedding']
+        except Exception as e:
+            print(f"Gemini Embedding failed: {e}")
+            return [0.0] * self.dimension
 
     def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]]):
         if not texts: return
-        embeddings = []
-        for text in texts:
-            embeddings.append(self.get_embedding(text))
-            
-        embeddings_np = np.array(embeddings).astype('float32')
-        # normalize for cosine similarity
-        faiss.normalize_L2(embeddings_np)
-        self.index.add(embeddings_np)
-        self.metadata.extend(metadatas)
         
-        # Save
-        os.makedirs(self.index_path, exist_ok=True)
-        faiss.write_index(self.index, self.index_file)
-        with open(self.meta_file, 'wb') as f:
-            pickle.dump(self.metadata, f)
+        try:
+            # Batch embedding to stay within limits and improve performance
+            result = genai.embed_content(
+                model=self.embed_model,
+                content=texts,
+                task_type="retrieval_document"
+            )
+            embeddings = result['embeddings']
+            
+            embeddings_np = np.array(embeddings).astype('float32')
+            # normalize for cosine similarity
+            faiss.normalize_L2(embeddings_np)
+            self.index.add(embeddings_np)
+            self.metadata.extend(metadatas)
+            
+            # Save
+            os.makedirs(self.index_path, exist_ok=True)
+            faiss.write_index(self.index, self.index_file)
+            with open(self.meta_file, 'wb') as f:
+                pickle.dump(self.metadata, f)
+            
+            # Ratelimit for free tier Gemini (15 RPM)
+            import time
+            time.sleep(4.1)
+        except Exception as e:
+            print(f"Failed to add texts to VectorDB: {e}")
 
     def similarity_search(self, query: str, k: int = 10) -> List[Dict[str, Any]]:
         if self.index.ntotal == 0:

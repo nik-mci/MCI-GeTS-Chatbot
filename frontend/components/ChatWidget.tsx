@@ -158,7 +158,7 @@ export default function ChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-jakarta">
+    <>
       {/* Popout Panel */}
       <AnimatePresence>
         {isOpen && (
@@ -166,31 +166,32 @@ export default function ChatWidget() {
             initial={{ opacity: 0, scale: 0.9, y: 20, transformOrigin: 'bottom right' }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="absolute bottom-20 right-0 w-[380px] h-[580px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200"
+            className="fixed bottom-[90px] sm:bottom-[100px] inset-x-4 sm:inset-x-auto sm:right-6 w-auto sm:w-[350px] h-[calc(100dvh-150px)] sm:h-[520px] max-h-[650px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200 z-[100]"
           >
-            {/* Header */}
-            <div className="bg-gets-red p-4 flex items-center justify-between text-white shadow-md">
+            {/* Header - Using Hardcoded Hex for Brand Consistency */}
+            <div className="bg-[#CC0000] p-3 sm:p-4 flex items-center justify-between text-white shadow-md relative z-10">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
                   <Globe size={18} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm">GeTS AI Assistant</h3>
-                  <div className="flex items-center gap-1.5">
+                  <h3 className="font-bold text-sm leading-tight text-white">GeTS AI Assistant</h3>
+                  <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                    <span className="text-[10px] text-white/80 font-medium">Online</span>
+                    <span className="text-[10px] text-white/90 font-medium">Online</span>
                   </div>
                 </div>
               </div>
               <button
                 onClick={toggleChat}
-                className="hover:bg-white/10 p-1.5 rounded-full transition-colors"
+                className="hover:bg-white/10 p-1.5 rounded-full transition-colors text-white"
+                aria-label="Close Chat"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Messages Area */}
+            {/* Messages Area - Ensuring clean scrollbar */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-scrollbar bg-[#f8fafc]">
               {messages.map((msg) => (
                 <div
@@ -199,14 +200,14 @@ export default function ChatWidget() {
                 >
                   <div className={`max-w-[80%] flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
                     <div
-                      className={`px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-sm ${msg.sender === 'user'
-                          ? 'bg-gets-red text-white rounded-tr-none'
+                      className={`px-4 py-2 rounded-2xl text-[13.5px] leading-relaxed shadow-sm ${msg.sender === 'user'
+                          ? 'bg-[#CC0000] text-white rounded-tr-none'
                           : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
                         }`}
                     >
                       {msg.text}
                     </div>
-                    <span className="text-[10px] text-slate-400 mt-1.5 uppercase font-medium tracking-wider">
+                    <span className="text-[9px] text-slate-400 mt-1 uppercase font-medium tracking-wider">
                       {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -225,8 +226,8 @@ export default function ChatWidget() {
 
               {error && (
                 <div className="flex justify-center">
-                  <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-xs flex items-center gap-2 border border-red-100">
-                    <AlertCircle size={14} />
+                  <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-[11px] flex items-center gap-2 border border-red-100">
+                    <AlertCircle size={13} />
                     {error}
                   </div>
                 </div>
@@ -238,7 +239,7 @@ export default function ChatWidget() {
                     <button
                       key={reply}
                       onClick={() => handleSend(reply)}
-                      className="px-3 py-1.5 rounded-full border border-gets-red text-gets-red text-[13px] font-medium hover:bg-gets-red hover:text-white transition-all active:scale-95 bg-white shadow-sm"
+                      className="px-2.5 py-1.5 rounded-full border border-[#CC0000] text-[#CC0000] text-[12px] font-medium hover:bg-[#CC0000] hover:text-white transition-all active:scale-95 bg-white shadow-sm"
                     >
                       {reply}
                     </button>
@@ -249,25 +250,25 @@ export default function ChatWidget() {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 bg-white border-t border-slate-100">
+            <div className="p-3 sm:p-4 bg-white border-t border-slate-100">
               <div className="relative flex items-center gap-2">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend(input)}
-                  placeholder="Type your travel query..."
-                  className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-gets-red/20 outline-none text-slate-700 placeholder:text-slate-400 transition-all"
+                  placeholder="Ask about travel..."
+                  className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-red-100 outline-none text-slate-700 placeholder:text-slate-400 transition-all"
                 />
                 <button
                   onClick={() => handleSend(input)}
                   disabled={!input.trim() || isLoading}
-                  className="bg-gets-red text-white p-3 rounded-xl hover:bg-[#b30000] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-900/10"
+                  className="bg-[#CC0000] text-white p-2.5 rounded-xl hover:bg-[#B30000] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                 >
-                  <Send size={18} />
+                  <Send size={16} />
                 </button>
               </div>
-              <p className="text-center text-[10px] text-slate-400 mt-3 font-medium uppercase tracking-widest">
+              <p className="text-center text-[9px] text-slate-400 mt-2 font-medium uppercase tracking-widest">
                 Powered by GeTS AI
               </p>
             </div>
@@ -275,21 +276,23 @@ export default function ChatWidget() {
         )}
       </AnimatePresence>
 
-      {/* Floating Bubble */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={toggleChat}
-        className="relative w-14 h-14 bg-gets-red rounded-full flex items-center justify-center text-white shadow-xl hover:shadow-2xl transition-all border-4 border-white/10"
-      >
-        {isOpen ? <X size={26} /> : <MessageCircle size={26} fill="white" />}
+      {/* Floating Bubble - Fixed Independently */}
+      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[110]">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={toggleChat}
+          className="relative w-12 h-12 sm:w-14 sm:h-14 bg-[#CC0000] rounded-full flex items-center justify-center text-white shadow-2xl hover:shadow-red-900/20 transition-all border-2 border-white/20"
+        >
+          {isOpen ? <X size={24} /> : <MessageCircle size={24} fill="white" />}
 
-        {notificationCount > 0 && !isOpen && (
-          <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-600 text-white text-[11px] font-bold rounded-full flex items-center justify-center border-2 border-white animate-bounce">
-            {notificationCount}
-          </span>
-        )}
-      </motion.button>
-    </div>
+          {notificationCount > 0 && !isOpen && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white animate-bounce">
+              {notificationCount}
+            </span>
+          )}
+        </motion.button>
+      </div>
+    </>
   );
-}
+}
