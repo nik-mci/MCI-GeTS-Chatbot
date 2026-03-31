@@ -30,24 +30,26 @@ executor = ThreadPoolExecutor(max_workers=4)
 app = FastAPI(
     title="GeTS Travel Hybrid RAG API",
     description="Production-grade conversational RAG API filtering Structured & IntelliTicks data through a strict LLM boundary.",
-    version="1.0.0"
+    version="1.1.0"
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# --- Startup Health Heartbeat ---
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🚀 [STARTUP] GeTS Chatbot Backend is Initializing...")
+    try:
+        from utils.vector_db import get_vector_db
+        db = get_vector_db()
+        count = db.get_count()
+        logger.info(f"✅ [DATABASE] Supabase Connected! Current Vectors: {count}")
+        logger.info(f"🧠 [MODELS] Provider: {settings.EMBEDDING_PROVIDER} | Model: {settings.FASTEMBED_MODEL}")
+    except Exception as e:
+        logger.error(f"❌ [CRITICAL] Database Connection Failed on Startup: {e}")
 
-@app.get("/health")
-async def health_check():
-    return {"status": "ok", "provider": settings.EMBEDDING_PROVIDER}
-
+# Manual CORS handling to prevent conflicts and ensure streaming works across origins
 @app.middleware("http")
 async def add_cors_headers(request, call_next):
-    # Handle preflight OPTIONS requests manually to be 100% sure headers are set
+    # Handle preflight OPTIONS requests manually
     if request.method == "OPTIONS":
         response = Response(status_code=200)
         response.headers["Access-Control-Allow-Origin"] = "*"
@@ -59,6 +61,7 @@ async def add_cors_headers(request, call_next):
     response = await call_next(request)
     
     # Inject CORS headers into EVERY response (including StreamingResponse)
+    # We use '*' for maximum flexibility, but also explicitly allow the Vercel domain
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, DELETE, PUT"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
