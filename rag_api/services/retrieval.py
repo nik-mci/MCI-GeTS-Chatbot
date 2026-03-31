@@ -14,10 +14,17 @@ def filter_by_metadata(items: List[Dict[str, Any]], intent_data: IntentExtractio
         if intent_data.destination:
             # Normalize to lowercase sets for efficient matching
             query_dests = set(d.lower() for d in intent_data.destination)
-            # Use the new 'destination' metadata field added during ingestion
             doc_dests = set(d.lower() for d in item.get('destination', []))
             
-            if query_dests.intersection(doc_dests):
+            # Normalize common variations for strict matching
+            def normalize_set(s):
+                res = set()
+                for item in s:
+                    n = item.replace(" india", "").replace("india ", "").strip()
+                    res.add(n)
+                return res
+
+            if normalize_set(query_dests).intersection(normalize_set(doc_dests)):
                 item['score'] *= 2.0  # Boost MATCH
                 item['confidence'] = 'high'
             elif doc_dests: # Intent has destination, Doc has destination, but they DON'T match
@@ -54,11 +61,14 @@ def retrieve_context(query: str, intent_data: IntentExtraction = None) -> List[D
     if intent_data and intent_data.rewritten_query:
         search_string = intent_data.rewritten_query
     
-    # Step B: Restrict raw retrieval down to 10 for latency and noise limits
-    raw_results = db.similarity_search(search_string, k=10)
+    # Step B: Increase retrieval depth to 50 to capture itineraries that might be semantically outranked by noise
+    raw_results = db.similarity_search(search_string, k=50)
     
     # Step C: Filter and score adjust only if intent_data is provided
     if intent_data:
-        return filter_by_metadata(raw_results, intent_data)
+        adjusted_results = filter_by_metadata(raw_results, intent_data)
+        # Re-sort based on new adjusted scores
+        sorted_results = sorted(adjusted_results, key=lambda x: x.get('score', 0), reverse=True)
+        return sorted_results[:10]  # Return top 10 high-quality results
     
-    return raw_results
+    return raw_results[:10]

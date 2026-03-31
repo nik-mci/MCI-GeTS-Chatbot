@@ -69,32 +69,24 @@ async def chat_endpoint(request: ChatRequest):
         logger.info(f"[REQUEST] Query received: \"{request.query}\"")
 
         # ----------------------------------------------------------------
-        # Step 1: Run Intent Extraction + Retrieval IN PARALLEL
-        # Intent uses the raw query — so does retrieval.
-        # They are independent and can run simultaneously.
-        # retrieve_context is synchronous (FAISS), so we offload it to a
-        # thread pool to avoid blocking the async event loop.
+        # Step 1: Sequential Intent and Retrieval
+        # Intent must be extracted FIRST to allow retrieve_context to boost 
+        # results based on destination/entities.
         # ----------------------------------------------------------------
-        loop = asyncio.get_event_loop()
-
-        parallel_start = datetime.utcnow()
-
         conversation_history = getattr(request, "conversation_history", []) or []
-        intent_task = extract_intent_and_entities(request.query, history=conversation_history)
-        retrieval_task = loop.run_in_executor(
+        intent_info = await extract_intent_and_entities(request.query, history=conversation_history)
+        
+        # Now run retrieval with the extracted intent
+        loop = asyncio.get_event_loop()
+        raw_results = await loop.run_in_executor(
             executor,
             retrieve_context,
             request.query,
-            None  # intent_info not available yet — retrieval uses raw query
+            intent_info
         )
 
-        # Run both concurrently — total time = max(intent_time, retrieval_time)
-        intent_info, raw_results = await asyncio.gather(intent_task, retrieval_task)
-
-        parallel_duration = (datetime.utcnow() - parallel_start).total_seconds()
         logger.info(f"[INTENT] Extracted: destination={intent_info.destination}, budget={intent_info.budget}, duration={intent_info.duration}")
         logger.info(f"[RETRIEVAL] Found {len(raw_results)} chunks")
-        logger.info(f"[PIPELINE] Intent + Retrieval completed in parallel in {parallel_duration:.2f}s")
 
         # ----------------------------------------------------------------
         # Step 2: Empty fallback — if retrieval returned nothing
@@ -110,9 +102,9 @@ async def chat_endpoint(request: ChatRequest):
             )
 
         # ----------------------------------------------------------------
-        # Step 3: Re-rank results (synchronous, fast — no LLM involved)
+        # Step 3: Re-rank results (increased top_k to provide more context)
         # ----------------------------------------------------------------
-        ranked_docs = rank_results(raw_results, top_k=3)
+        ranked_docs = rank_results(raw_results, top_k=10)
 
         if ranked_docs:
             top_score = round(ranked_docs[0].get('final_score', 0.0), 4)
@@ -216,25 +208,20 @@ async def chat_stream_endpoint(request: ChatRequest):
             start_time = datetime.utcnow()
             logger.info(f"[REQUEST] Stream query received: \"{request.query}\"")
 
-            # --- Parallel intent + retrieval (same as /chat) ---
-            loop = asyncio.get_event_loop()
-            parallel_start = datetime.utcnow()
-
+            # --- Sequential intent and retrieval ---
             conversation_history = getattr(request, "conversation_history", []) or []
-            intent_task = extract_intent_and_entities(request.query, history=conversation_history)
-            retrieval_task = loop.run_in_executor(
+            intent_info = await extract_intent_and_entities(request.query, history=conversation_history)
+            
+            loop = asyncio.get_event_loop()
+            raw_results = await loop.run_in_executor(
                 executor,
                 retrieve_context,
                 request.query,
-                None
+                intent_info
             )
 
-            intent_info, raw_results = await asyncio.gather(intent_task, retrieval_task)
-
-            parallel_duration = (datetime.utcnow() - parallel_start).total_seconds()
             logger.info(f"[INTENT] Extracted: destination={intent_info.destination}, budget={intent_info.budget}, duration={intent_info.duration}")
             logger.info(f"[RETRIEVAL] Found {len(raw_results)} chunks")
-            logger.info(f"[PIPELINE] Intent + Retrieval completed in parallel in {parallel_duration:.2f}s")
 
             # --- Fallback if no results ---
             if not raw_results:
@@ -244,8 +231,8 @@ async def chat_stream_endpoint(request: ChatRequest):
                 yield "data: [DONE]\n\n"
                 return
 
-            # --- Re-rank ---
-            ranked_docs = rank_results(raw_results, top_k=3)
+            # --- Re-rank (increased depth) ---
+            ranked_docs = rank_results(raw_results, top_k=10)
             if not ranked_docs:
                 fallback = "I couldn't find exact relevant travel information. Please refine your query or contact GeTS support!"
                 log_observability(request.query, intent_info.dict(), [], fallback)

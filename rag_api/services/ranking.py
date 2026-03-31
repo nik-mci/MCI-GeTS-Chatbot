@@ -11,6 +11,7 @@ def rank_results(results: List[Dict[str, Any]], top_k: int = 3) -> List[Dict[str
         base_score = doc.get("score", 0.0)
         source = doc.get("source", "unknown")
         confidence = doc.get("confidence", "low")
+        doc["final_score"] = base_score # Initialize before multipliers
         
         # Priority Multiplier Logic
         if source == "database":  # Future SQL/Supabase Integration Source
@@ -25,8 +26,9 @@ def rank_results(results: List[Dict[str, Any]], top_k: int = 3) -> List[Dict[str
                 # Disincentivize low confidence historical logs unless nothing else exists
                 doc["final_score"] = base_score * 0.5
                 
-        else:
-            doc["final_score"] = base_score
+        # 4. Source-type Boost (Prioritize Word Doc Itineraries over Scraped Summaries)
+        if str(source).lower().endswith(".docx"):
+            doc["final_score"] *= 2.5
             
     # Sort descending by newly calculated final score
     ranked = sorted(results, key=lambda x: x["final_score"], reverse=True)

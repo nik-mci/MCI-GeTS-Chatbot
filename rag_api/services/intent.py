@@ -1,4 +1,5 @@
-import google.generativeai as genai
+# import google.generativeai as genai
+from groq import Groq
 import json
 import logging
 from typing import List, Dict, Any, Optional
@@ -7,8 +8,11 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# Configure Gemini
-genai.configure(api_key=settings.GEMINI_API_KEY)
+# Initialize Groq Client
+client = Groq(api_key=settings.GROQ_API_KEY)
+
+# Configure Gemini (Commented out)
+# genai.configure(api_key=settings.GEMINI_API_KEY)
 
 from models.schemas import IntentExtraction
 
@@ -33,6 +37,23 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
     """
     
     try:
+        # --- Groq Implementation ---
+        prompt = f"Conversation History:\n{history}\n\nLatest User Query: {query}"
+        
+        response = client.chat.completions.create(
+            model=settings.GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"}, # Force JSON mode
+            temperature=0,
+        )
+        
+        data = json.loads(response.choices[0].message.content)
+
+        # --- Original Gemini Implementation (Commented) ---
+        """
         model = genai.GenerativeModel(
             model_name=settings.GEMINI_MODEL,
             system_instruction=system_prompt
@@ -49,6 +70,7 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
         )
         
         data = json.loads(response.text)
+        """
         
         # Ensure it matches our IntentExtraction model
         extracted_intent = IntentExtraction(**data)

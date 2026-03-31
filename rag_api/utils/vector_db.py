@@ -3,12 +3,9 @@ import numpy as np
 import json
 import os
 import pickle
-import google.generativeai as genai
+from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any
 from config import settings
-
-# Configure Gemini for Embeddings
-genai.configure(api_key=settings.GEMINI_API_KEY)
 
 class VectorDBBase:
     def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]]):
@@ -17,16 +14,22 @@ class VectorDBBase:
         pass
 
 class FAISSDB(VectorDBBase):
+    _model = None  # Class-level shared model to avoid reloading
+
     def __init__(self):
-        self.index_path = settings.FAISS_INDEX_PATH
-        # Gemini Embedding Dimensions (gemini-embedding-2-preview is 3072)
-        self.dimension = 3072
+        self.index_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), settings.FAISS_INDEX_PATH))
         
-        # We use Gemini for embeddings to solve local memory pressure
-        self.embed_model = "models/gemini-embedding-2-preview"
+        # Local Sentence Transformer Model (384 dimensions)
+        self.model_name = 'all-MiniLM-L6-v2'
+        self.dimension = 384
+        
+        if FAISSDB._model is None:
+            print(f"Loading local embedding model: {self.model_name}...")
+            FAISSDB._model = SentenceTransformer(self.model_name)
         
         self.index_file = os.path.join(self.index_path, "index.faiss")
         self.meta_file = os.path.join(self.index_path, "metadata.pkl")
+        print(f"VectorDB initialized with path: {self.index_path}")
         
         if os.path.exists(self.index_file) and os.path.exists(self.meta_file):
             try:
@@ -49,30 +52,22 @@ class FAISSDB(VectorDBBase):
         self.metadata = []
 
     def get_embedding(self, text: str) -> List[float]:
+        """Generates embedding using local model."""
         try:
-            result = genai.embed_content(
-                model=self.embed_model,
-                content=text,
-                task_type="retrieval_query"
-            )
-            return result['embedding']
+            return FAISSDB._model.encode(text).tolist()
         except Exception as e:
-            print(f"Gemini Embedding failed: {e}")
+            print(f"Local Embedding failed: {e}")
             return [0.0] * self.dimension
 
     def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]]):
+        """Adds texts to the index using local embeddings (FAST)."""
         if not texts: return
         
         try:
-            # Batch embedding to stay within limits and improve performance
-            result = genai.embed_content(
-                model=self.embed_model,
-                content=texts,
-                task_type="retrieval_document"
-            )
-            embeddings = result['embeddings']
-            
+            # Batch embedding (Local model handles this extremely fast)
+            embeddings = FAISSDB._model.encode(texts)
             embeddings_np = np.array(embeddings).astype('float32')
+            
             # normalize for cosine similarity
             faiss.normalize_L2(embeddings_np)
             self.index.add(embeddings_np)
@@ -84,24 +79,24 @@ class FAISSDB(VectorDBBase):
             with open(self.meta_file, 'wb') as f:
                 pickle.dump(self.metadata, f)
             
-            # Ratelimit for free tier Gemini (15 RPM)
-            import time
-            time.sleep(4.1)
+            print(f"Added {len(texts)} texts. Total in index: {self.index.ntotal}")
         except Exception as e:
             print(f"Failed to add texts to VectorDB: {e}")
+            raise e
 
     def similarity_search(self, query: str, k: int = 10) -> List[Dict[str, Any]]:
         if self.index.ntotal == 0:
             return []
             
-        query_emb = np.array([self.get_embedding(query)]).astype('float32')
+        embeddings = FAISSDB._model.encode([query])
+        query_emb = np.array(embeddings).astype('float32')
         faiss.normalize_L2(query_emb)
         
         distances, indices = self.index.search(query_emb, k)
         
         results = []
         for dist, idx in zip(distances[0], indices[0]):
-            if idx != -1:
+            if idx != -1 and idx < len(self.metadata):
                 meta = self.metadata[idx].copy()
                 meta['score'] = float(dist)
                 results.append(meta)

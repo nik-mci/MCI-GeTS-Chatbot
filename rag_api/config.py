@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     FAISS_INDEX_PATH: str = "faiss_index"
     QA_PAIRS_PATH: str = "../output/qa_pairs.json"
     SCRAPED_PAGES_PATH: str = "../data/raw/scraped_pages.json"
+    ITINERARY_DOCS_PATH: str = "../GeTS Itineraries"
     
     # Future DB support
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
@@ -20,7 +21,23 @@ class Settings(BaseSettings):
     }
 
     # Data Quality
-    KNOWN_DESTINATIONS: list = ["bali", "dubai", "maldives", "switzerland", "thailand", "europe"]
+    KNOWN_DESTINATIONS: list = [
+        # Regional/State (India)
+        "kerala", "rajasthan", "goa", "kashmir", "ladakh", "himachal", "uttarakhand",
+        "sikkim", "assam", "meghalaya", "arunachal", "nagaland", "manipur", "mizoram", "tripura",
+        "karnataka", "tamil nadu", "andhra pradesh", "telangana", "gujarat", "maharashtra", 
+        "west bengal", "odisha", "punjab", "haryana", "uttar pradesh", "madhya pradesh", "andaman",
+        "north india", "south india", "east india", "west india", "central india", "north east", "northeast",
+        
+        # Cities & Key Landmarks
+        "delhi", "agra", "jaipur", "jodhpur", "udaipur", "pushkar", "ranthambore", "varanasi", 
+        "rishikesh", "mathura", "vrindavan", "orchha", "khajuraho", "mumbai", "amritsar", 
+        "hampi", "kaziranga", "leh", "dharamshala", "golden triangle",
+        
+        # International
+        "bhutan", "nepal", "sri lanka", "bali", "dubai", "maldives", "switzerland", "thailand", "europe",
+        "vietnam", "cambodia", "laos", "turkey", "egypt", "greece"
+    ]
     
     BAD_PATTERNS: list = [
         r"connect you to",
@@ -29,7 +46,13 @@ class Settings(BaseSettings):
         r"leave your message",
         r"we will get back",
         r"our team will contact",
-        r"please provide (name|email|phone)"
+        r"please provide (name|email|phone)",
+        r"awesome! in this tour, discover",
+        r"may i have your name please",
+        r"how many adults will be joining",
+        r"gets holidays helps you explore more",
+        r"if you want india tour i can help",
+        r"you want (.*) tour from (.*)\? right"
     ]
     
     LEAD_CAPTURE_PATTERNS: list = [

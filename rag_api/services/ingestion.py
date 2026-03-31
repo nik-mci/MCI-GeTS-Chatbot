@@ -3,6 +3,7 @@ import os
 import json
 import logging
 import re
+from docx import Document
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.vector_db import get_vector_db
@@ -16,9 +17,14 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 def extract_destinations(text: str) -> list:
-    """Deterministic destination extraction."""
-    text_lower = text.lower()
-    return [d for d in settings.KNOWN_DESTINATIONS if d in text_lower]
+    """Deterministic destination extraction with normalization."""
+    text_normalized = text.lower().replace("-", " ")
+    found = []
+    for d in settings.KNOWN_DESTINATIONS:
+        # Match as whole word or part of hyphenated term
+        if d in text_normalized:
+            found.append(d)
+    return list(set(found))
 
 def is_low_quality(item: dict) -> bool:
     """
@@ -117,6 +123,65 @@ def ingest_scraped_pages():
         batch_meta = metadatas[i:i+BATCH_SIZE]
         db.add_texts(batch_text, batch_meta)
 
+def ingest_itineraries_docs():
+    """Ingests GeTS Itineraries from .docx files."""
+    db = get_vector_db()
+    docs_path = settings.ITINERARY_DOCS_PATH
+    
+    if not os.path.exists(docs_path):
+        logger.error(f"Could not find Itineraries folder at {docs_path}")
+        return
+
+    all_files = [f for f in os.listdir(docs_path) if f.endswith('.docx')]
+    logger.info(f"Found {len(all_files)} .docx itineraries in {docs_path}")
+
+    texts = []
+    metadatas = []
+
+    for filename in tqdm(all_files, desc="Processing Itinerary DOCX"):
+        file_path = os.path.join(docs_path, filename)
+        try:
+            doc = Document(file_path)
+            full_text = []
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    full_text.append(para.text.strip())
+            
+            content = "\n".join(full_text)
+            title = filename.replace("- Rewritten Itinerary", "").replace("- Rewritten itinerary", "").replace(".docx", "").strip()
+            
+            # Extract destination from filename or content
+            dest = extract_destinations(f"{title} {content}")
+            
+            meta_base = {
+                "source": filename,
+                "title": title,
+                "type": "itinerary_doc",
+                "confidence": 1.0,
+                "destination": dest,
+                "tags": ["itinerary", "internal_doc"]
+            }
+
+            chunks = chunk_text_by_words(content, max_words=150, overlap=30)
+            for i, chunk in enumerate(chunks):
+                chunk_text = f"Itinerary: {title}\nContent: {chunk}"
+                meta = meta_base.copy()
+                meta["chunk_id"] = i
+                meta["answer"] = chunk_text
+                texts.append(chunk_text)
+                metadatas.append(meta)
+
+        except Exception as e:
+            logger.error(f"Failed to process {filename}: {e}")
+
+    logger.info(f"Generated {len(texts)} chunks from docx itineraries.")
+    
+    BATCH_SIZE = 50
+    for i in tqdm(range(0, len(texts), BATCH_SIZE), desc="Embedding Itinerary Batches"):
+        batch_text = texts[i:i+BATCH_SIZE]
+        batch_meta = metadatas[i:i+BATCH_SIZE]
+        db.add_texts(batch_text, batch_meta)
+
 def ingest_qa_pairs(overwrite: bool = True):
     """Reads cleaned qa_pairs.json and populates the Vector DB."""
     db = get_vector_db()
@@ -209,5 +274,7 @@ def ingest_qa_pairs(overwrite: bool = True):
 if __name__ == "__main__":
     # Ingest QA pairs first (overwrites existing index)
     ingest_qa_pairs(overwrite=True)
-    # Then append scraped pages to the index
+    # Then append scraped pages
     ingest_scraped_pages()
+    # Finally append DOCX itineraries
+    ingest_itineraries_docs()
