@@ -5,6 +5,8 @@ import os
 import pickle
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any
+import uuid
+from pinecone import Pinecone
 from config import settings
 
 class VectorDBBase:
@@ -12,6 +14,8 @@ class VectorDBBase:
         pass
     def similarity_search(self, query: str, k: int = 10) -> List[Dict[str, Any]]:
         pass
+    def get_count(self) -> int:
+        return 0
 
 class FAISSDB(VectorDBBase):
     _model = None  # Class-level shared model to avoid reloading
@@ -102,6 +106,88 @@ class FAISSDB(VectorDBBase):
                 results.append(meta)
         return results
 
+    def get_count(self) -> int:
+        return self.index.ntotal
+
+class PineconeDB(VectorDBBase):
+    _model = None
+
+    def __init__(self):
+        self.model_name = 'all-MiniLM-L6-v2'
+        self.dimension = 384
+        
+        if PineconeDB._model is None:
+            print(f"Loading local embedding model: {self.model_name}...")
+            PineconeDB._model = SentenceTransformer(self.model_name)
+            
+        print(f"Connecting to Pinecone Index: {settings.PINECONE_INDEX_NAME}...")
+        pc = Pinecone(api_key=settings.PINECONE_API_KEY)
+        self.index = pc.Index(settings.PINECONE_INDEX_NAME)
+
+    def get_embedding(self, text: str) -> List[float]:
+        try:
+            return PineconeDB._model.encode(text).tolist()
+        except Exception as e:
+            print(f"Local Embedding failed: {e}")
+            return [0.0] * self.dimension
+
+    def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]]):
+        if not texts: return
+        
+        try:
+            embeddings = PineconeDB._model.encode(texts).tolist()
+            
+            vectors = []
+            for i, (text, meta) in enumerate(zip(texts, metadatas)):
+                # Ensure metadata values are strings, ints, floats, or lists of strings
+                clean_meta = {}
+                for k, v in meta.items():
+                    if isinstance(v, (str, int, float, bool)):
+                        clean_meta[k] = v
+                    elif isinstance(v, list) and all(isinstance(i, str) for i in v):
+                        clean_meta[k] = v
+                    elif v is None:
+                        clean_meta[k] = ""
+                    else:
+                        clean_meta[k] = json.dumps(v)
+                        
+                vector_id = str(uuid.uuid4())
+                clean_meta['text'] = text
+                vectors.append({"id": vector_id, "values": embeddings[i], "metadata": clean_meta})
+                
+            batch_size = 100
+            for i in range(0, len(vectors), batch_size):
+                batch = vectors[i:i + batch_size]
+                self.index.upsert(vectors=batch)
+                
+            print(f"Added {len(texts)} texts to Pinecone.")
+        except Exception as e:
+            print(f"Failed to add texts to PineconeDB: {e}")
+            raise e
+
+    def similarity_search(self, query: str, k: int = 10) -> List[Dict[str, Any]]:
+        query_emb = PineconeDB._model.encode([query]).tolist()[0]
+        
+        response = self.index.query(
+            vector=query_emb,
+            top_k=k,
+            include_metadata=True
+        )
+        
+        results = []
+        for match in response.matches:
+            if match.metadata:
+                meta = match.metadata.copy()
+                meta['score'] = float(match.score)
+                results.append(meta)
+        return results
+
+    def get_count(self) -> int:
+        stats = self.index.describe_index_stats()
+        return stats.get('total_vector_count', 0)
+
 # Expose a factory pattern making it easy to swap implementations
 def get_vector_db() -> VectorDBBase:
+    if settings.PINECONE_API_KEY:
+        return PineconeDB()
     return FAISSDB()

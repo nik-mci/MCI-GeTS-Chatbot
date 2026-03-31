@@ -202,8 +202,8 @@ def ingest_qa_pairs(overwrite: bool = True):
             logger.info("Cleared existing FAISS index for rebuild.")
             # Re-initialize empty DB
             db = get_vector_db()
-    elif not overwrite and hasattr(db, 'index') and db.index.ntotal > 0:
-        logger.info(f"Vector DB already contains {db.index.ntotal} items. Skipping ingestion.")
+    elif not overwrite and db.get_count() > 0:
+        logger.info(f"Vector DB already contains {db.get_count()} items. Skipping ingestion.")
         return
 
     texts = []

@@ -33,10 +33,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS Middleware to allow Next.js frontend connection
+# Add CORS Middleware to allow Next.js frontend connection from any domain (Vercel)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -285,3 +285,8 @@ async def chat_stream_endpoint(request: ChatRequest):
             "X-Accel-Buffering": "no",  # Prevents Nginx from buffering the stream
         }
     )
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
