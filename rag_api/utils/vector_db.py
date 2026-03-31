@@ -117,22 +117,11 @@ class SupabaseDB(VectorDBBase):
                 measure="cosine_distance"
             )
             
-            # vecs results are list of (id, metadata)
-            # though some versions return different layouts. 
-            # Standard vecs: returns list of match IDs if include_metadata=False, 
-            # or list of (id, metadata) if include_metadata=True
             results = []
             for item in response:
-                # If vecs returns (id, metadata), we extract meta
                 if isinstance(item, tuple) and len(item) >= 2:
                     meta = item[1].copy()
-                    # vecs doesn't usually return score in simple query, 
-                    # but we can try to get it if needed. 
-                    # For now just return metadata as it has the 'text'
                     results.append(meta)
-                else:
-                    # just id or something else
-                    pass
             return results
         except Exception as e:
             print(f"Similarity search failed: {e}")
@@ -140,12 +129,16 @@ class SupabaseDB(VectorDBBase):
 
     def get_count(self) -> int:
         try:
-            # vecs doesn't provide a direct .count(), but we can do a raw query 
-            # or just return 0 if not critical
-            return 0 
-        except:
+            import psycopg2
+            conn = psycopg2.connect(settings.SUPABASE_CONNECTION_STRING)
+            with conn.cursor() as cur:
+                cur.execute(f'SELECT count(*) FROM vecs."{self.collection_name}"')
+                count = cur.fetchone()[0]
+                conn.close()
+                return count
+        except Exception as e:
+            print(f"Failed to get vector count: {e}")
             return 0
 
 def get_vector_db() -> VectorDBBase:
-    # Always return SupabaseDB for production/cloud-native
     return SupabaseDB()
