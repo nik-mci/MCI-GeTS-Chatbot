@@ -37,35 +37,50 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     logger.info("🚀 [STARTUP] GeTS Chatbot Backend is Initializing...")
+    
+    # 1. Check Database
     try:
         from utils.vector_db import get_vector_db
         db = get_vector_db()
         count = db.get_count()
         logger.info(f"✅ [DATABASE] Supabase Connected! Current Vectors: {count}")
-        logger.info(f"🧠 [MODELS] Provider: {settings.EMBEDDING_PROVIDER} | Model: {settings.FASTEMBED_MODEL}")
     except Exception as e:
-        logger.error(f"❌ [CRITICAL] Database Connection Failed on Startup: {e}")
+        logger.error(f"❌ [CRITICAL] Database Connection Failed: {e}")
 
-# Manual CORS handling to prevent conflicts and ensure streaming works across origins
+    # 2. Check Groq
+    try:
+        from services.generation import client as groq_client
+        # Fast dummy check (we don't want to waste tokens, just check initialization)
+        if groq_client.api_key:
+            logger.info(f"✅ [AI-GROQ] Groq model '{settings.GROQ_MODEL}' is ready.")
+        else:
+            logger.error("❌ [AI-GROQ] Groq API Key is MISSING!")
+    except Exception as e:
+        logger.error(f"❌ [AI-GROQ] Groq initialization failed: {e}")
+
+    # 3. Check Gemini
+    try:
+        if settings.GEMINI_API_KEY:
+            logger.info(f"✅ [AI-GEMINI] Gemini model '{settings.GEMINI_MODEL}' is ready.")
+        else:
+            logger.error("❌ [AI-GEMINI] Gemini API Key is MISSING!")
+    except Exception as e:
+        logger.error(f"❌ [AI-GEMINI] Gemini initialization failed: {e}")
+
+# Manual CORS handling - Ultra Permissive for Production Hardening
 @app.middleware("http")
 async def add_cors_headers(request, call_next):
-    # Handle preflight OPTIONS requests manually
     if request.method == "OPTIONS":
         response = Response(status_code=200)
         response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, DELETE, PUT"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
         return response
     
-    # Process the request
     response = await call_next(request)
-    
-    # Inject CORS headers into EVERY response (including StreamingResponse)
-    # We use '*' for maximum flexibility, but also explicitly allow the Vercel domain
     response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, DELETE, PUT"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
     return response
 
 LOG_FILE = "rag_log.jsonl"
