@@ -1,15 +1,16 @@
-# import google.generativeai as genai
+import google.generativeai as genai
 from groq import Groq
 import logging
 import time
+import asyncio
 from config import settings
 from typing import List, Dict, Any
 
 # Configure Groq
 client = Groq(api_key=settings.GROQ_API_KEY)
 
-# Configure Gemini (Commented out)
-# genai.configure(api_key=settings.GEMINI_API_KEY)
+# Configure Gemini
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -194,7 +195,7 @@ You will receive context snippets from our Knowledge Base. Prioritize them in th
 3. [WEBSITE DATA] - Fallback source for general company profile information.
 
 GROUNDING — ABSOLUTE RULES:
-1. BUSINESS FACTS (STRICT): You are strictly forbidden from guessing or estimating business facts. Never fabricate or provide unverified prices, hotel names, package policies, or exact itinerary specifics unless explicitly found in the retrieved context.
+1. BUSINESS FACTS (STRICT): You are strictly forbidden from guessing or editing business facts. Never fabricate or provide unverified prices, hotel names, package policies, or exact itinerary specifics unless explicitly found in the retrieved context.
 2. DESTINATION KNOWLEDGE (FLEXIBLE): You MAY use your general world knowledge (training data) to describe the culture, geography, general weather, history, and safety of travel destinations (e.g., "Kashmir is incredibly beautiful and generally safe for tourists...").
 3. OFF-TOPIC QUESTIONS: Never answer questions unrelated to travel planning, geography, or holidays.
 4. PERSONAL DETAILS: Never invent personal details, preferences, or health statuses about the user.
@@ -246,7 +247,7 @@ async def generate_response(
     conversation_history: List[Dict[str, str]] = []
 ) -> str:
     """
-    Generates a grounded, context-aware response using Gemini.
+    Generates a grounded, context-aware response using Groq with Gemini fallback.
     """
     start_time = time.time()
 
@@ -280,54 +281,53 @@ async def generate_response(
                 history_lines.append(f"{role}: {content}")
         history_text = "\n".join(history_lines)
 
-    # --- Call LLM ---
+    # --- Call LLM with Resilience ---
     try:
-        # --- Groq Implementation ---
-        prompt = f"CONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\nCURRENT USER MESSAGE:\n{query}"
-        
-        response = client.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.4,
-            max_tokens=1024,
-        )
-        
-        response_text = response.choices[0].message.content.strip()
-
-        # --- Original Gemini Implementation (Commented) ---
-        """
-        model = genai.GenerativeModel(
-            model_name=settings.GEMINI_MODEL,
-            system_instruction=SYSTEM_PROMPT,
-            safety_settings={
-                genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-                genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
-                genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-                genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            }
-        )
-        
-        prompt = f"CONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\nCURRENT USER MESSAGE:\n{query}"
-        
-        response = await model.generate_content_async(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.2,
-                max_output_tokens=1024,
+        # --- Attempt 1: Groq ---
+        try:
+            logger.info(f"🤖 [GENERATION] Attempting response with Groq ({settings.GROQ_MODEL})...")
+            prompt = f"CONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\nCURRENT USER MESSAGE:\n{query}"
+            
+            response = client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.4,
+                max_tokens=1024,
             )
-        )
-        response_text = response.text.strip()
-        """
-        
-        elapsed = round(time.time() - start_time, 2)
-        logger.info(f"[GENERATION] Groq response generated in {elapsed}s | Words: {len(response_text.split())}")
-        return response_text
+            
+            response_text = response.choices[0].message.content.strip()
+            elapsed = round(time.time() - start_time, 2)
+            logger.info(f"✅ [GENERATION] Groq success in {elapsed}s")
+            return response_text
+
+        except Exception as groq_err:
+            logger.warning(f"⚠️ [GENERATION] Groq failed or rate-limited: {groq_err}. Falling back to Gemini...")
+            
+            # --- Attempt 2: Gemini Fallback ---
+            model = genai.GenerativeModel(
+                model_name=settings.GEMINI_MODEL,
+                system_instruction=SYSTEM_PROMPT
+            )
+            
+            prompt = f"CONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\nCURRENT USER MESSAGE:\n{query}"
+            
+            response = await model.generate_content_async(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.4,
+                    max_output_tokens=1024,
+                )
+            )
+            response_text = response.text.strip()
+            elapsed = round(time.time() - start_time, 2)
+            logger.info(f"✨ [GENERATION] Gemini Fallback success in {elapsed}s")
+            return response_text
 
     except Exception as e:
-        logger.error(f"[GENERATION] LLM failed: {str(e)}", exc_info=True)
+        logger.error(f"❌ [GENERATION] All LLM providers failed: {str(e)}", exc_info=True)
         return "I'm having trouble right now. Please try again or contact the GeTS team directly for assistance."
 
 
@@ -337,7 +337,7 @@ async def generate_response_stream(
     conversation_history: List[Dict[str, str]] = []
 ):
     """
-    Streaming version of generate_response using Gemini.
+    Streaming version of generate_response with automatic fallback from Groq to Gemini.
     """
     # --- Build context ---
     TOP_K_CHUNKS = 10
@@ -371,55 +371,54 @@ async def generate_response_stream(
                 history_lines.append(f"{role}: {content}")
         history_text = "\n".join(history_lines)
 
-    # --- Stream from LLM ---
+    # --- Stream from LLM with Resilience ---
     try:
-        # --- Groq Implementation ---
         prompt = f"CONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\nCURRENT USER MESSAGE:\n{query}"
         
-        response = client.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.4,
-            max_tokens=1024,
-            stream=True
-        )
+        # --- Attempt 1: Groq ---
+        try:
+            logger.info(f"🌊 [STREAM] Attempting stream with Groq ({settings.GROQ_MODEL})...")
+            response = client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.4,
+                max_tokens=1024,
+                stream=True
+            )
 
-        for chunk in response:
-            if chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+            for chunk in response:
+                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+            
+            logger.info("✅ [STREAM] Groq stream completed.")
 
-        # --- Original Gemini Implementation (Commented) ---
-        """
-        model = genai.GenerativeModel(
-            model_name=settings.GEMINI_MODEL,
-            system_instruction=SYSTEM_PROMPT,
-            safety_settings={
-                genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-                genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
-                genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-                genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            }
-        )
-        
-        prompt = f"CONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\nCURRENT USER MESSAGE:\n{query}"
-        
-        response = await model.generate_content_async(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.2,
-                max_output_tokens=1024,
-            ),
-            stream=True
-        )
+        except Exception as groq_err:
+            logger.warning(f"⚠️ [STREAM] Groq stream failed: {groq_err}. Falling back to Gemini stream...")
+            
+            # --- Attempt 2: Gemini Fallback ---
+            model = genai.GenerativeModel(
+                model_name=settings.GEMINI_MODEL,
+                system_instruction=SYSTEM_PROMPT
+            )
+            
+            response = await model.generate_content_async(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.4,
+                    max_output_tokens=1024,
+                ),
+                stream=True
+            )
 
-        async for chunk in response:
-            if chunk.text:
-                yield chunk.text
-        """
+            async for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+            
+            logger.info("✨ [STREAM] Gemini Fallback stream completed.")
 
     except Exception as e:
-        logger.error(f"[GENERATION] LLM stream failed: {e}")
+        logger.error(f"❌ [STREAM] All LLM providers failed: {e}")
         yield "I'm having trouble right now. Please try again or contact the GeTS team directly for assistance."

@@ -1,4 +1,4 @@
-# import google.generativeai as genai
+import google.generativeai as genai
 from groq import Groq
 import json
 import logging
@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 # Initialize Groq Client
 client = Groq(api_key=settings.GROQ_API_KEY)
 
-# Configure Gemini (Commented out)
-# genai.configure(api_key=settings.GEMINI_API_KEY)
+# Configure Gemini
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 from models.schemas import IntentExtraction
 
@@ -37,45 +37,50 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
     """
     
     try:
-        # --- Groq Implementation ---
-        prompt = f"Conversation History:\n{history}\n\nLatest User Query: {query}"
-        
-        response = client.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"}, # Force JSON mode
-            temperature=0,
-        )
-        
-        data = json.loads(response.choices[0].message.content)
-
-        # --- Original Gemini Implementation (Commented) ---
-        """
-        model = genai.GenerativeModel(
-            model_name=settings.GEMINI_MODEL,
-            system_instruction=system_prompt
-        )
-        
-        prompt = f"Conversation History:\n{history}\n\nLatest User Query: {query}"
-        
-        response = await model.generate_content_async(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
+        # --- Attempt 1: Groq ---
+        try:
+            logger.info("🧠 [INTENT] Attempting extraction with Groq...")
+            prompt = f"Conversation History:\n{history}\n\nLatest User Query: {query}"
+            
+            response = client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"}, # Force JSON mode
                 temperature=0,
-                response_mime_type="application/json",
             )
-        )
-        
-        data = json.loads(response.text)
-        """
+            
+            data = json.loads(response.choices[0].message.content)
+            logger.info("✅ [INTENT] Groq extraction success.")
+
+        except Exception as groq_err:
+            logger.warning(f"⚠️ [INTENT] Groq failed: {groq_err}. Falling back to Gemini...")
+            
+            # --- Attempt 2: Gemini Fallback ---
+            model = genai.GenerativeModel(
+                model_name=settings.GEMINI_MODEL,
+                system_instruction=system_prompt
+            )
+            
+            prompt = f"Conversation History:\n{history}\n\nLatest User Query: {query}"
+            
+            response = await model.generate_content_async(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0,
+                    response_mime_type="application/json",
+                )
+            )
+            
+            data = json.loads(response.text)
+            logger.info("✨ [INTENT] Gemini Fallback extraction success.")
         
         # Ensure it matches our IntentExtraction model
         extracted_intent = IntentExtraction(**data)
         
-        # Fallback: Deterministic Destination Extraction if Gemini misses it
+        # Fallback: Deterministic Destination Extraction if LLM misses it
         if not extracted_intent.destination:
             from services.ingestion import extract_destinations
             extracted_intent.destination = extract_destinations(query)
@@ -85,6 +90,6 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
         return extracted_intent
 
     except Exception as e:
-        logger.error(f"Intent extraction failed: {e}")
+        logger.error(f"❌ [INTENT] All extraction attempts failed: {e}")
         # Return fallback neutral intent and raw query if extraction fails entirely
         return IntentExtraction(intent="general", rewritten_query=query, destination=[])
