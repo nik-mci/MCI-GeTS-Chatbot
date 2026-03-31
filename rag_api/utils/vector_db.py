@@ -21,16 +21,27 @@ class VectorDBBase:
 class SupabaseDB(VectorDBBase):
     def __init__(self):
         self.model_name = settings.GEMINI_EMBEDDING_MODEL
-        self.dimension = 768
+        self.dimension = 3072  # Gemini models like text-embedding-004 default to 3072
         self.collection_name = "gets_travel_vectors"
         
         print(f"Connecting to Supabase (pgvector) Collection: {self.collection_name}...")
-        # create_client takes the connection string
         self.vx = vecs.create_client(settings.SUPABASE_CONNECTION_STRING)
-        self.collection = self.vx.get_or_create_collection(
-            name=self.collection_name, 
-            dimension=self.dimension
-        )
+        
+        try:
+            self.collection = self.vx.get_or_create_collection(
+                name=self.collection_name, 
+                dimension=self.dimension
+            )
+        except Exception as e:
+            if "dimension" in str(e).lower():
+                print(f"⚠️ Dimension mismatch detected. Recreating collection '{self.collection_name}' with {self.dimension} dimensions...")
+                self.vx.delete_collection(self.collection_name)
+                self.collection = self.vx.get_or_create_collection(
+                    name=self.collection_name, 
+                    dimension=self.dimension
+                )
+            else:
+                raise e
 
     def get_embedding(self, text: str) -> List[float]:
         try:
