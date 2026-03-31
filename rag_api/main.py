@@ -45,31 +45,35 @@ async def startup_event():
         count = db.get_count()
         logger.info(f"✅ [DATABASE] Supabase Connected! Current Vectors: {count}")
     except Exception as e:
-        logger.error(f"❌ [CRITICAL] Database Connection Failed: {e}")
+        logger.error(f"❌ [DATABASE] Connection Failed: {e}")
 
-    # 2. Check Groq
+    # 2. Check AI Providers (Real token test)
     try:
-        from services.generation import client as groq_client
-        # Fast dummy check (we don't want to waste tokens, just check initialization)
-        if groq_client.api_key:
-            logger.info(f"✅ [AI-GROQ] Groq model '{settings.GROQ_MODEL}' is ready.")
-        else:
-            logger.error("❌ [AI-GROQ] Groq API Key is MISSING!")
+        from services.generation import check_ai_status
+        ai_results = await check_ai_status()
+        for provider, status in ai_results.items():
+            logger.info(f"{status} [AI-{provider.upper()}] Status Check")
     except Exception as e:
-        logger.error(f"❌ [AI-GROQ] Groq initialization failed: {e}")
-
-    # 3. Check Gemini
-    try:
-        if settings.GEMINI_API_KEY:
-            logger.info(f"✅ [AI-GEMINI] Gemini model '{settings.GEMINI_MODEL}' is ready.")
-        else:
-            logger.error("❌ [AI-GEMINI] Gemini API Key is MISSING!")
-    except Exception as e:
-        logger.error(f"❌ [AI-GEMINI] Gemini initialization failed: {e}")
+        logger.error(f"❌ [AI-STATUS] Could not perform provider check: {e}")
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "provider": settings.EMBEDDING_PROVIDER}
+    from services.generation import check_ai_status
+    from utils.vector_db import get_vector_db
+    
+    ai_status = await check_ai_status()
+    db_count = "unknown"
+    try:
+        db = get_vector_db()
+        db_count = db.get_count()
+    except:
+        pass
+
+    return {
+        "status": "ok",
+        "database": {"vectors": db_count},
+        "ai_providers": ai_status
+    }
 
 # Manual CORS handling - Ultra Permissive for Production Hardening
 @app.middleware("http")
