@@ -19,7 +19,15 @@ from models.schemas import IntentExtraction
 async def extract_intent_and_entities(query: str, history: list = None) -> IntentExtraction:
     """Uses Gemini to extract structured travel entities and rebuilds a dense vector-optimized search string."""
     
-    system_prompt = """
+    # Format history for the prompt
+    history_str = ""
+    if history:
+        for msg in history:
+            role = "User" if msg.get("role") == "user" else "Assistant"
+            content = msg.get("content", "")
+            history_str += f"{role}: {content}\n"
+
+    system_prompt = f"""
     You are an intelligent query parser for a travel company chatbot retrieval engine.
     Extract the following entities if present in the user query:
     - destination (array of strings, e.g. ["Delhi", "Agra"])
@@ -39,10 +47,11 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
     """
     
     try:
+        prompt = f"Conversation History:\n{history_str}\n\nLatest User Query: {query}"
+
         # --- Attempt 1: Groq ---
         try:
             logger.info("🧠 [INTENT] Attempting extraction with Groq...")
-            prompt = f"Conversation History:\n{history}\n\nLatest User Query: {query}"
             
             response = client.chat.completions.create(
                 model=settings.GROQ_MODEL,
@@ -65,8 +74,6 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
                 model_name=settings.GEMINI_MODEL,
                 system_instruction=system_prompt
             )
-            
-            prompt = f"Conversation History:\n{history}\n\nLatest User Query: {query}"
             
             response = await model.generate_content_async(
                 prompt,

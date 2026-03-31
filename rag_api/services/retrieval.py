@@ -10,6 +10,10 @@ def filter_by_metadata(items: List[Dict[str, Any]], intent_data: IntentExtractio
     """Filters and dynamically adjust scores based on extracted intents and metadata."""
     filtered = []
     for item in items:
+        # Initialize score if not present (safety)
+        if 'score' not in item:
+            item['score'] = 0.1  # Low default fallback
+            
         # 1. Destination Match/Mismatch Scoring
         if intent_data.destination:
             # Normalize to lowercase sets for efficient matching
@@ -19,27 +23,30 @@ def filter_by_metadata(items: List[Dict[str, Any]], intent_data: IntentExtractio
             # Normalize common variations for strict matching
             def normalize_set(s):
                 res = set()
-                for item in s:
-                    n = item.replace(" india", "").replace("india ", "").strip()
+                for i in s:
+                    n = str(i).replace(" india", "").replace("india ", "").strip()
                     res.add(n)
                 return res
+            
+            normalized_query = normalize_set(query_dests)
+            normalized_doc = normalize_set(doc_dests)
 
-            if normalize_set(query_dests).intersection(normalize_set(doc_dests)):
-                item['score'] *= 2.0  # Boost MATCH
+            if normalized_query.intersection(normalized_doc):
+                item['score'] *= 2.5  # Heavy boost for MATCH
                 item['confidence'] = 'high'
             elif doc_dests: # Intent has destination, Doc has destination, but they DON'T match
-                item['score'] *= 0.7  # Penalize MISMATCH
+                item['score'] *= 0.6  # Penalize MISMATCH
                 
         # 2. Generic Phrase Penalty
-        answer_text = item.get('answer', '').lower()
+        answer_text = str(item.get('answer', '')).lower()
         for pattern in settings.BAD_PATTERNS:
             if re.search(pattern, answer_text):
-                item['score'] *= 0.5 # Heavy penalty for chatbot/system phrases
+                item['score'] *= 0.4 # Heavy penalty for chatbot/system phrases
                 break
                 
-        # 3. Pricing Intent Boost (Keep existing)
+        # 3. Pricing Intent Boost
         if intent_data.intent == 'pricing' and 'pricing' in item.get('tags', []):
-            item['score'] *= 1.2
+            item['score'] *= 1.3
             
         # 4. Hard Filter (Safety Safeguard)
         hard_bad_patterns = settings.LEAD_CAPTURE_PATTERNS
