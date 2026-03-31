@@ -34,7 +34,7 @@ def run_migration():
     if os.path.exists(settings.QA_PAIRS_PATH):
         if progress["qa_pairs"] == 0:
             print("\n📥 Ingesting QA pairs...")
-            ingest_qa_pairs(settings.QA_PAIRS_PATH)
+            ingest_qa_pairs(overwrite=False)
             progress["qa_pairs"] = 1
             save_progress(progress)
         else:
@@ -46,7 +46,7 @@ def run_migration():
     if os.path.exists(settings.SCRAPED_PAGES_PATH):
         if progress["scraped_pages"] == 0:
             print("\n📥 Ingesting scraped pages...")
-            ingest_scraped_pages(settings.SCRAPED_PAGES_PATH)
+            ingest_scraped_pages()
             progress["scraped_pages"] = 1
             save_progress(progress)
         else:

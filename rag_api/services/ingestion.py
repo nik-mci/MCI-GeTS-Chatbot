@@ -262,8 +262,8 @@ def ingest_qa_pairs(overwrite: bool = True):
     if total_count > 0 and (kept_count / total_count) < 0.10:
         logger.warning("ALERT: Keep rate is below 10%! Whitelist might be too strict.")
         
-    # Reduced batch size to 20 for Gemini Free Tier stability
-    BATCH_SIZE = 20
+    # Increased batch size to 100 for local FastEmbed (no rate limits)
+    BATCH_SIZE = 100
     for i in tqdm(range(0, len(texts), BATCH_SIZE), desc="Embedding batches"):
         batch_text = texts[i:i+BATCH_SIZE]
         batch_meta = metadatas[i:i+BATCH_SIZE]
