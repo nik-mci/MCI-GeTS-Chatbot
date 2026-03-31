@@ -1,0 +1,17 @@
+# Ignore all backend and data files for Vercel (Frontend only deployment)
+rag_api/
+ingestion/
+data/
+GeTS Itineraries/
+Model Change.txt
+PROJECT_OVERVIEW.txt
+Procfile
+debug_embeddings.py
+diagnostic.py
+list_gemini_models.py
+messages_dump.json
+output/
+process_intelliticks.py
+requirements.txt
+.venv/
+venv/
