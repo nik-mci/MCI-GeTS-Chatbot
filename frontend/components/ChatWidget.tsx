@@ -84,7 +84,7 @@ export default function ChatWidget() {
       }));
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://gets-travel-chatbot-production.up.railway.app';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://web-production-9e89e.up.railway.app';
       const response = await fetch(`${apiBaseUrl}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
