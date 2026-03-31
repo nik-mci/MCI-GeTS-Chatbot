@@ -37,11 +37,12 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
     - intent (enum: pricing, booking, itinerary, general)
     
     CRITICAL INSTRUCTION - BROAD THEMES:
-    If a user asks for a theme (Family, Honeymoon, Adventure, Luxury, Wildlife) WITHOUT a destination:
-    1. Set destination to an empty array [].
-    2. Rewrite the query to target typical "best-of" or "popular" packages for that theme.
-    Example: "Family trip 👨‍👩‍👧‍👧" -> "popular family tour packages and itineraries in India and beyond"
-    Example: "Honeymoon 💑" -> "romantic honeymoon packages with luxury stays and private tours"
+    If a user asks for a theme (Family, Honeymoon, Adventure, Luxury, Wildlife) WITHOUT a destination in the latest query:
+    1. Check the Conversation History for a previously mentioned destination.
+    2. If a destination was mentioned, rewrite the query specifically for that theme in that destination (e.g., "Family trip" + previous "Kerala" -> "family tour packages in Kerala").
+    3. If no destination was previously mentioned, rewrite to target general "best-of" or "popular" packages for that theme.
+    Example: "Family trip 👨‍👩‍👧‍👧" (no history) -> "popular family tour packages and itineraries in India and beyond"
+    Example: "Honeymoon 💑" (history has "Goa") -> "romantic honeymoon packages in Goa with luxury stays"
 
     Return ONLY valid, parsable JSON matching the schema.
     """

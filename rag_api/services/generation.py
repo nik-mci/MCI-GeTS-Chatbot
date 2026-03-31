@@ -208,6 +208,8 @@ You will receive context snippets from our Knowledge Base. Prioritize them in th
 2. [INTELLITICKS DATA] - Primary source for Company Q&A, Customer Service policies, and FAQs.
 3. [WEBSITE DATA] - Fallback source for general company profile information.
 
+If information in [WEBSITE DATA] contradicts [ITINERARY DATA], always follow [ITINERARY DATA].
+
 GROUNDING — ABSOLUTE RULES:
 1. BUSINESS FACTS (STRICT): You are strictly forbidden from guessing or editing business facts. Never fabricate or provide unverified prices, hotel names, package policies, or exact itinerary specifics unless explicitly found in the retrieved context.
 2. DESTINATION KNOWLEDGE (FLEXIBLE): You MAY use your general world knowledge (training data) to describe the culture, geography, general weather, history, and safety of travel destinations (e.g., "Kashmir is incredibly beautiful and generally safe for tourists...").
@@ -273,15 +275,20 @@ async def generate_response(
     if ranked_docs:
         context_parts = []
         for i, doc in enumerate(ranked_docs[:TOP_K_CHUNKS]):
-            src = (doc.get("source") or "unknown").upper()
+            # Map source to clear labels for the LLM
+            raw_src = str(doc.get("source") or "unknown").lower()
+            src_label = "ITINERARY DATA"
+            if "intelliticks" in raw_src:
+                src_label = "INTELLITICKS DATA"
+            elif "website" in raw_src or "http" in raw_src:
+                src_label = "WEBSITE DATA"
+            
             conf = (doc.get("confidence") or "unknown").upper()
             answer = doc.get("answer") or doc.get("content") or ""
             answer = str(answer).strip()
-            words = answer.split()
-            if len(words) > MAX_WORDS_PER_CHUNK:
-                answer = " ".join(words[:MAX_WORDS_PER_CHUNK]) + "..."
+            
             if answer:
-                context_parts.append(f"[Source {i+1} | {src} | Confidence: {conf}]\n{answer}")
+                context_parts.append(f"[{src_label} | Source {i+1} | Confidence: {conf}]\n{answer}")
         context_text = "\n---\n".join(context_parts)
 
     # --- Build history ---
@@ -361,24 +368,28 @@ async def generate_response_stream(
     if ranked_docs:
         context_parts = []
         for i, doc in enumerate(ranked_docs[:TOP_K_CHUNKS]):
-            src_val = doc.get("source_url") or doc.get("source") or "unknown"
-            src = str(src_val).upper()
+            # Map source to clear labels for the LLM
+            raw_src = str(doc.get("source") or "unknown").lower()
+            src_label = "ITINERARY DATA"
+            if "intelliticks" in raw_src:
+                src_label = "INTELLITICKS DATA"
+            elif "website" in raw_src or "http" in raw_src:
+                src_label = "WEBSITE DATA"
+
             conf_val = doc.get("confidence")
             conf = str(conf_val).upper() if conf_val is not None else "UNKNOWN"
             answer = doc.get("answer") or doc.get("content") or ""
             answer = str(answer).strip()
-            words = answer.split()
-            if len(words) > MAX_WORDS_PER_CHUNK:
-                answer = " ".join(words[:MAX_WORDS_PER_CHUNK]) + "..."
+            
             if answer:
-                context_parts.append(f"[Source {i+1} | {src} | Confidence: {conf}]\n{answer}")
+                context_parts.append(f"[{src_label} | Source {i+1} | Confidence: {conf}]\n{answer}")
         context_text = "\n---\n".join(context_parts)
 
     # --- Build history ---
     history_text = "This is the start of the conversation."
     if conversation_history:
         history_lines = []
-        for turn in conversation_history[-6:]:
+        for turn in conversation_history[-10:]: # Increased depth to 10
             role = "User" if turn.get("role") == "user" else "Assistant"
             content = turn.get("content", "").strip()
             if content:
