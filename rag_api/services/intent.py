@@ -28,10 +28,12 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
     - travel_date (string, e.g. "Next month", "December 2026")
     - intent (enum: pricing, booking, itinerary, general)
     
-    CRITICAL INSTRUCTION - REWRITTEN QUERY:
-    Generate an optimal search engine query from the user's intent. 
-    Make it highly dense and descriptive ignoring conversational filler.
-    Example Input: "I want a cheap bali trip" -> Output: "budget Bali tour packages with itinerary and pricing"
+    CRITICAL INSTRUCTION - BROAD THEMES:
+    If a user asks for a theme (Family, Honeymoon, Adventure, Luxury, Wildlife) WITHOUT a destination:
+    1. Set destination to an empty array [].
+    2. Rewrite the query to target typical "best-of" or "popular" packages for that theme.
+    Example: "Family trip 👨‍👩‍👧‍👧" -> "popular family tour packages and itineraries in India and beyond"
+    Example: "Honeymoon 💑" -> "romantic honeymoon packages with luxury stays and private tours"
 
     Return ONLY valid, parsable JSON matching the schema.
     """

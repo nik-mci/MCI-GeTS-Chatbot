@@ -166,10 +166,10 @@ async def chat_endpoint(request: ChatRequest):
 
             # Hard confidence threshold — if best match is too weak,
             # skip LLM generation entirely and return honest fallback
-            CONFIDENCE_THRESHOLD = 0.15
+            CONFIDENCE_THRESHOLD = 0.10
             if top_score < CONFIDENCE_THRESHOLD:
                 logger.warning(f"[RETRIEVAL] Score {top_score} below threshold {CONFIDENCE_THRESHOLD} — returning fallback")
-                fallback = "I don't have specific information on that in my current knowledge base. GeTS Holidays specializes in incredible India tours — I'd love to help you explore destinations like Kerala, Rajasthan, the Golden Triangle, or Kashmir. Or I can connect you with our travel experts directly!"
+                fallback = "I'd love to help you plan that! 🌍 GeTS Holidays specializes in incredible India tours. Do you have a specific destination in mind, or would you like to explore popular spots like Kerala, Rajasthan, or the Golden Triangle?"
                 log_observability(request.query, intent_info.dict(), [], fallback)
                 return ChatResponse(
                     answer=fallback,
@@ -279,7 +279,7 @@ async def chat_stream_endpoint(request: ChatRequest):
 
             # --- Fallback if no results ---
             if not raw_results:
-                fallback = "I couldn't find exact relevant travel information. Please refine your query or contact GeTS support for a custom itinerary!"
+                fallback = "I'd love to help you plan a trip! ✈️ Do you have a specific destination in mind (like Kerala or Rajasthan), or a particular theme you're looking for (Family, Honeymoon, Adventure)?"
                 log_observability(request.query, intent_info.dict(), [], fallback)
                 yield f"data: {fallback}\n\n"
                 yield "data: [DONE]\n\n"
@@ -288,7 +288,7 @@ async def chat_stream_endpoint(request: ChatRequest):
             # --- Re-rank (increased depth) ---
             ranked_docs = rank_results(raw_results, top_k=10)
             if not ranked_docs:
-                fallback = "I couldn't find exact relevant travel information. Please refine your query or contact GeTS support!"
+                fallback = "I couldn't find specific details for that, but I can suggest some amazing alternatives! Are you looking for a beach holiday, a mountain escape, or a cultural tour?"
                 log_observability(request.query, intent_info.dict(), [], fallback)
                 yield f"data: {fallback}\n\n"
                 yield "data: [DONE]\n\n"
