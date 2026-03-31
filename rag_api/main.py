@@ -67,6 +67,10 @@ async def startup_event():
     except Exception as e:
         logger.error(f"❌ [AI-GEMINI] Gemini initialization failed: {e}")
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "provider": settings.EMBEDDING_PROVIDER}
+
 # Manual CORS handling - Ultra Permissive for Production Hardening
 @app.middleware("http")
 async def add_cors_headers(request, call_next):
