@@ -68,7 +68,7 @@ async def add_cors_headers(request, call_next):
 LOG_FILE = "rag_log.jsonl"
 
 def log_observability(query: str, intent: dict, docs: list, answer: str):
-    """Write telemetry to local JSONL for debugging bad retrievals."""
+    """Write telemetry to local JSONL and echo to stdout for Railway logging."""
     log_entry = {
         "timestamp": datetime.utcnow().isoformat(),
         "query": query,
@@ -76,6 +76,11 @@ def log_observability(query: str, intent: dict, docs: list, answer: str):
         "retrieved_docs": [doc.get("question", "UNKNOWN") for doc in docs],
         "final_answer": answer
     }
+    
+    # 1. Echo to standard logger so it appears in Railway Dashboard
+    logger.info(f"📊 [OBSERVABILITY] Query: \"{query}\" | Intent: {intent.get('intent', 'none')} | Docs Found: {len(docs)}")
+    
+    # 2. Write to local file (ephemeral)
     try:
         with open(LOG_FILE, "a") as f:
             f.write(json.dumps(log_entry) + "\n")
