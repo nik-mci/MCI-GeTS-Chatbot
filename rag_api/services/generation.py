@@ -422,3 +422,35 @@ async def generate_response_stream(
     except Exception as e:
         logger.error(f"❌ [STREAM] All LLM providers failed: {e}")
         yield "I'm having trouble right now. Please try again or contact the GeTS team directly for assistance."
+
+async def check_ai_status() -> Dict[str, str]:
+    """
+    Performs a real, 1-token test on both Groq and Gemini to see if they are functional 
+    (i.e., not out of tokens, not rate-limited, and key is valid).
+    """
+    results = {"groq": "unknown", "gemini": "unknown"}
+    
+    # 1. Test Groq
+    try:
+        # Use a very short timeout for health checks
+        groq_test = client.chat.completions.create(
+            model=settings.GROQ_MODEL,
+            messages=[{"role": "user", "content": "hi"}],
+            max_tokens=1
+        )
+        if groq_test.choices:
+            results["groq"] = "✅ Active"
+    except Exception as e:
+        results["groq"] = f"❌ Error: {str(e)[:50]}..."
+
+    # 2. Test Gemini
+    try:
+        model = genai.GenerativeModel(model_name=settings.GEMINI_MODEL)
+        # Use a sync-wrapper or async call for Gemini
+        gemini_test = await model.generate_content_async("hi", generation_config={"max_output_tokens": 1})
+        if gemini_test:
+            results["gemini"] = "✅ Active"
+    except Exception as e:
+        results["gemini"] = f"❌ Error: {str(e)[:50]}..."
+
+    return results
