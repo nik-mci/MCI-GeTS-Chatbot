@@ -12,9 +12,9 @@ class Settings(BaseSettings):
     SCRAPED_PAGES_PATH: str = "../data/raw/scraped_pages.json"
     ITINERARY_DOCS_PATH: str = "../GeTS Itineraries"
     
-    # Future DB support
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
+    SUPABASE_CONNECTION_STRING: str = os.getenv("SUPABASE_CONNECTION_STRING", "")
     
     # Vector DB Support
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")

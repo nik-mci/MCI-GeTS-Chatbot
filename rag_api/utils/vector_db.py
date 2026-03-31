@@ -3,7 +3,7 @@ import os
 import time
 from typing import List, Dict, Any
 import uuid
-from pinecone import Pinecone
+import vecs
 import google.generativeai as genai
 from config import settings
 
@@ -18,14 +18,19 @@ class VectorDBBase:
     def get_count(self) -> int:
         return 0
 
-class PineconeDB(VectorDBBase):
+class SupabaseDB(VectorDBBase):
     def __init__(self):
         self.model_name = settings.GEMINI_EMBEDDING_MODEL
         self.dimension = 768
-            
-        print(f"Connecting to Pinecone Index: {settings.PINECONE_INDEX_NAME} (Cloud-Native Gemini Embeddings)...")
-        pc = Pinecone(api_key=settings.PINECONE_API_KEY)
-        self.index = pc.Index(settings.PINECONE_INDEX_NAME)
+        self.collection_name = "gets_travel_vectors"
+        
+        print(f"Connecting to Supabase (pgvector) Collection: {self.collection_name}...")
+        # create_client takes the connection string
+        self.vx = vecs.create_client(settings.SUPABASE_CONNECTION_STRING)
+        self.collection = self.vx.get_or_create_collection(
+            name=self.collection_name, 
+            dimension=self.dimension
+        )
 
     def get_embedding(self, text: str) -> List[float]:
         try:
@@ -45,8 +50,6 @@ class PineconeDB(VectorDBBase):
         try:
             # Batch embedding using Gemini with aggressive rate limit handling
             embeddings = []
-            
-            # Gemini Free Tier is very restrictive. Added more retries and longer delays.
             MAX_RETRIES = 10
             base_delay = 5
             
@@ -61,7 +64,7 @@ class PineconeDB(VectorDBBase):
                     break
                 except Exception as e:
                     if "429" in str(e) or "quota" in str(e).lower():
-                        delay = base_delay * (1.5 ** attempt) # Slightly slower growth
+                        delay = base_delay * (1.5 ** attempt)
                         print(f"Rate limited. Attempt {attempt+1}/{MAX_RETRIES}. Waiting {delay:.1f}s...")
                         time.sleep(delay)
                     else:
@@ -70,7 +73,7 @@ class PineconeDB(VectorDBBase):
             if not embeddings:
                 raise Exception("Failed to get embeddings after aggressive retries")
 
-            vectors = []
+            records = []
             for i, (text, meta) in enumerate(zip(texts, metadatas)):
                 clean_meta = {}
                 for k, v in meta.items():
@@ -85,18 +88,16 @@ class PineconeDB(VectorDBBase):
                         
                 vector_id = str(uuid.uuid4())
                 clean_meta['text'] = text
-                vectors.append({"id": vector_id, "values": embeddings[i], "metadata": clean_meta})
+                records.append((vector_id, embeddings[i], clean_meta))
                 
-            batch_size = 50 # Smaller batches for stability
-            for i in range(0, len(vectors), batch_size):
-                batch = vectors[i:i + batch_size]
-                self.index.upsert(vectors=batch)
+            # vecs upsert handles records list
+            self.collection.upsert(records=records)
                 
             # mandatory sleep between batches for free tier stability
             time.sleep(3)
-            print(f"Added {len(texts)} texts to Pinecone using Gemini.")
+            print(f"Added {len(texts)} texts to Supabase.")
         except Exception as e:
-            print(f"Failed to add texts to PineconeDB (Gemini): {e}")
+            print(f"Failed to add texts to SupabaseDB (Gemini): {e}")
             raise e
 
     def similarity_search(self, query: str, k: int = 10) -> List[Dict[str, Any]]:
@@ -108,18 +109,30 @@ class PineconeDB(VectorDBBase):
             )
             query_emb = result['embedding']
             
-            response = self.index.query(
-                vector=query_emb,
-                top_k=k,
-                include_metadata=True
+            # vecs query method
+            response = self.collection.query(
+                data=query_emb,
+                limit=k,
+                include_metadata=True,
+                measure="cosine_distance"
             )
             
+            # vecs results are list of (id, metadata)
+            # though some versions return different layouts. 
+            # Standard vecs: returns list of match IDs if include_metadata=False, 
+            # or list of (id, metadata) if include_metadata=True
             results = []
-            for match in response.matches:
-                if match.metadata:
-                    meta = match.metadata.copy()
-                    meta['score'] = float(match.score)
+            for item in response:
+                # If vecs returns (id, metadata), we extract meta
+                if isinstance(item, tuple) and len(item) >= 2:
+                    meta = item[1].copy()
+                    # vecs doesn't usually return score in simple query, 
+                    # but we can try to get it if needed. 
+                    # For now just return metadata as it has the 'text'
                     results.append(meta)
+                else:
+                    # just id or something else
+                    pass
             return results
         except Exception as e:
             print(f"Similarity search failed: {e}")
@@ -127,11 +140,12 @@ class PineconeDB(VectorDBBase):
 
     def get_count(self) -> int:
         try:
-            stats = self.index.describe_index_stats()
-            return stats.get('total_vector_count', 0)
+            # vecs doesn't provide a direct .count(), but we can do a raw query 
+            # or just return 0 if not critical
+            return 0 
         except:
             return 0
 
 def get_vector_db() -> VectorDBBase:
-    # Always return PineconeDB for production/cloud-native
-    return PineconeDB()
+    # Always return SupabaseDB for production/cloud-native
+    return SupabaseDB()

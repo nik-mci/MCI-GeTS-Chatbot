@@ -9,4 +9,5 @@ python-dotenv>=1.0.0
 google-generativeai>=0.3.0
 groq>=0.13.0
 python-docx
-pinecone>=8.0.0
+vecs
+psycopg2-binary
