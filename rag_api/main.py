@@ -255,17 +255,17 @@ async def chat_stream_endpoint(request: ChatRequest):
     Streaming version of the chat endpoint.
     Runs the same parallel intent + retrieval pipeline, then streams
     Gemini tokens to the frontend via Server-Sent Events (SSE).
-    No extra API cost — same Gemini call, just token-by-token delivery.
     """
     async def event_stream():
         try:
             start_time = datetime.utcnow()
-            logger.info(f"[REQUEST] Stream query received: \"{request.query}\"")
+            logger.info(f"🌊 [STREAM] Query received: \"{request.query}\"")
 
-            # --- Sequential intent and retrieval ---
+            # --- Step 1: Intent Extraction ---
             conversation_history = getattr(request, "conversation_history", []) or []
             intent_info = await extract_intent_and_entities(request.query, history=conversation_history)
             
+            # --- Step 2: Retrieval (In Executor) ---
             loop = asyncio.get_event_loop()
             raw_results = await loop.run_in_executor(
                 executor,
@@ -273,36 +273,34 @@ async def chat_stream_endpoint(request: ChatRequest):
                 request.query,
                 intent_info
             )
-
-            logger.info(f"[INTENT] Extracted: destination={intent_info.destination}, budget={intent_info.budget}, duration={intent_info.duration}")
-            logger.info(f"[RETRIEVAL] Found {len(raw_results)} chunks")
-
-            # --- Fallback if no results ---
+            
+            logger.info(f"🔎 [STREAM] Found {len(raw_results)} raw results from search")
+            
+            # --- Step 3: Handle Zero Results ---
             if not raw_results:
+                logger.warning(f"⚠️ [STREAM] Zero results found for: \"{request.query}\"")
                 fallback = "I'd love to help you plan a trip! ✈️ Do you have a specific destination in mind (like Kerala or Rajasthan), or a particular theme you're looking for (Family, Honeymoon, Adventure)?"
                 log_observability(request.query, intent_info.dict(), [], fallback)
                 yield f"data: {fallback}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
-            # --- Re-rank (increased depth) ---
+            # --- Step 4: Rerank & Check Confidence ---
             ranked_docs = rank_results(raw_results, top_k=10)
             if not ranked_docs:
+                logger.warning("⚠️ [STREAM] No docs passed reranking filters")
                 fallback = "I couldn't find specific details for that, but I can suggest some amazing alternatives! Are you looking for a beach holiday, a mountain escape, or a cultural tour?"
                 log_observability(request.query, intent_info.dict(), [], fallback)
                 yield f"data: {fallback}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
-            if ranked_docs:
-                top_score = round(ranked_docs[0].get('final_score', 0.0), 4)
-                logger.info(f"[RETRIEVAL] Reranked top score: {top_score}")
+            top_score = ranked_docs[0].get('final_score', 0.0)
+            logger.info(f"📊 [STREAM] Top Match Score: {top_score:.4f} (Threshold: 0.10)")
 
-            # --- Stream generation token by token ---
+            # --- Step 5: Stream Generation ---
             gen_start = datetime.utcnow()
             full_answer = ""
-
-            logger.info(f"[GENERATION] Starting stream | Query: '{request.query}' | Docs: {len(ranked_docs)}")
 
             async for token in generate_response_stream(
                 query=request.query,
@@ -310,22 +308,18 @@ async def chat_stream_endpoint(request: ChatRequest):
                 conversation_history=conversation_history
             ):
                 full_answer += token
-                # Encode token as SSE — escape newlines so they don't break the protocol
                 safe_token = token.replace("\n", "\\n")
                 yield f"data: {safe_token}\n\n"
 
             gen_duration = (datetime.utcnow() - gen_start).total_seconds()
             total_duration = (datetime.utcnow() - start_time).total_seconds()
-            logger.info(f"[GENERATION] Stream completed in {gen_duration:.2f}s | Words: {len(full_answer.split())}")
-            logger.info(f"[PIPELINE] Total stream request completed in {total_duration:.2f}s")
+            logger.info(f"✅ [STREAM] Completed in {total_duration:.2f}s | Words: {len(full_answer.split())}")
 
             log_observability(request.query, intent_info.dict(), ranked_docs, full_answer)
-
-            # Signal to frontend that stream is done
             yield "data: [DONE]\n\n"
 
         except Exception as e:
-            logger.error(f"[ERROR] Stream failed for query \"{request.query}\": {str(e)}")
+            logger.error(f"🔥 [STREAM-ERROR] Failed for query \"{request.query}\": {str(e)}")
             logger.error(traceback.format_exc())
             yield "data: [ERROR] I'm having trouble right now. Please try again.\n\n"
             yield "data: [DONE]\n\n"
@@ -336,7 +330,7 @@ async def chat_stream_endpoint(request: ChatRequest):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Prevents Nginx from buffering the stream
+            "X-Accel-Buffering": "no",
         }
     )
 

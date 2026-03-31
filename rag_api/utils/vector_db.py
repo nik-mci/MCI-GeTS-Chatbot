@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 import time
 from typing import List, Dict, Any
 import uuid
@@ -7,6 +8,10 @@ import vecs
 import google.generativeai as genai
 import numpy as np
 from config import settings
+
+# Configure Logging
+import logging
+logger = logging.getLogger(__name__)
 
 # FastEmbed import (will be installed via requirements.txt)
 try:
@@ -160,7 +165,8 @@ class SupabaseDB(VectorDBBase):
                     results.append(meta)
             return results
         except Exception as e:
-            print(f"Similarity search failed: {e}")
+            logger.error(f"❌ [DATABASE] Similarity search failed: {e}")
+            logger.error(traceback.format_exc())
             return []
 
     def get_count(self) -> int:

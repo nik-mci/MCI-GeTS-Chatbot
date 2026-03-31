@@ -68,7 +68,11 @@ def retrieve_context(query: str, intent_data: IntentExtraction = None) -> List[D
     if intent_data and intent_data.rewritten_query:
         search_string = intent_data.rewritten_query
     
-    # Step B: Increase retrieval depth to 50 to capture itineraries that might be semantically outranked by noise
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔍 [RETRIEVAL] Querying Vector DB with: \"{search_string}\"")
+
+    # Step B: Increase retrieval depth to 50
     raw_results = db.similarity_search(search_string, k=50)
     
     # Step C: Filter and score adjust only if intent_data is provided
