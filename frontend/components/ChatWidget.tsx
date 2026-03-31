@@ -85,6 +85,8 @@ export default function ChatWidget() {
 
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://web-production-9e89e.up.railway.app';
+      console.log(`[GeTS AI] Connecting to backend at: ${apiBaseUrl}`);
+      
       const response = await fetch(`${apiBaseUrl}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
