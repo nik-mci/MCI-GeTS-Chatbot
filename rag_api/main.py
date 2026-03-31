@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -33,7 +33,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS Middleware to allow Next.js frontend connection from any domain (Vercel)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,6 +40,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "provider": settings.EMBEDDING_PROVIDER}
+
+@app.middleware("http")
+async def add_cors_headers(request, call_next):
+    # Handle preflight OPTIONS requests manually to be 100% sure headers are set
+    if request.method == "OPTIONS":
+        response = Response(status_code=200)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, DELETE, PUT"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return response
+    
+    # Process the request
+    response = await call_next(request)
+    
+    # Inject CORS headers into EVERY response (including StreamingResponse)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, DELETE, PUT"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    
+    return response
 
 LOG_FILE = "rag_log.jsonl"
 
