@@ -159,16 +159,14 @@ class SupabaseDB(VectorDBBase):
     def similarity_search(self, query: str, k: int = 10) -> List[Dict[str, Any]]:
         try:
             query_emb = self.get_embedding(query)
-            logger.info(f"🔬 [DEBUG] Query embedding dim: {len(query_emb)}")
             
             response = self.collection.query(
                 data=query_emb,
                 limit=k,
                 include_metadata=True,
+                include_value=True,
                 measure="cosine_distance"
             )
-            
-            logger.info(f"🔬 [DEBUG] Raw vecs response: {response}")
             
             results = []
             for item in response:
