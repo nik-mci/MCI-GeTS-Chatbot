@@ -170,7 +170,7 @@ class SupabaseDB(VectorDBBase):
             
             results = []
             for item in response:
-                if isinstance(item, tuple) and len(item) >= 2:
+                if len(item) >= 2:
                     meta = {}
                     distance = 0.0
                     
