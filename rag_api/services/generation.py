@@ -62,11 +62,9 @@ NON-SUPPORTED DESTINATIONS (STRICT RULE)
 LEGAL
 - If asked, confirm you are an AI assistant.
 - Never request or store sensitive personal data. If shared, gracefully ignore it and redirect.
-"""ot repeat it—redirect safely.
 
 CLOSING
 If the user ends the conversation, respond warmly in one sentence without a question.
-
 """
 
 def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_history: List[Dict[str, str]]) -> str:
