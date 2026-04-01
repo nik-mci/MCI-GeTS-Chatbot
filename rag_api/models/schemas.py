@@ -11,8 +11,9 @@ class IntentExtraction(BaseModel):
     budget: Optional[str] = None
     duration: Optional[str] = None
     travel_date: Optional[str] = None
-    intent: str  # pricing, booking, itinerary, general
-    rewritten_query: str # Optimized dense search format
+    intent: str = "general" # pricing, booking, itinerary, general
+    rewritten_query: str = "" # Optimized dense search format
+    theme: Optional[str] = None # Theme extracted to help rewriting, optional
 
 class SourceDocument(BaseModel):
     content: str

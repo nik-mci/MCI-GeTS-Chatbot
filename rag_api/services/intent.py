@@ -35,16 +35,17 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
     - duration (string, e.g. "5 days", "1 week")
     - travel_date (string, e.g. "Next month", "December 2026")
     - intent (enum: pricing, booking, itinerary, general)
+    - theme (string, optional: e.g. "Beach", "Honeymoon", "Adventure")
+    - rewritten_query (string) **MANDATORY**: A clean, dense, search-optimized representation of the user's intent to query the vector database.
     
-    CRITICAL INSTRUCTION - BROAD THEMES:
-    If a user asks for a theme (Family, Honeymoon, Adventure, Luxury, Wildlife) WITHOUT a destination in the latest query:
-    1. Check the Conversation History for a previously mentioned destination.
-    2. If a destination was mentioned, rewrite the query specifically for that theme in that destination (e.g., "Family trip" + previous "Kerala" -> "family tour packages in Kerala").
-    3. If no destination was previously mentioned, rewrite to target general "best-of" or "popular" packages for that theme.
-    Example: "Family trip 👨‍👩‍👧‍👧" (no history) -> "popular family tour packages and itineraries in India and beyond"
-    Example: "Honeymoon 💑" (history has "Goa") -> "romantic honeymoon packages in Goa with luxury stays"
+    CRITICAL INSTRUCTION - REWRITTEN QUERY & THEMES:
+    1. If a user asks for a theme (e.g. "Beach holiday") WITHOUT a destination:
+       - Check the Conversation History for a previously mentioned destination.
+       - If a destination was mentioned, weave the theme into the rewritten query (e.g., "Family trip" + previous "Kerala" -> "family tour packages in Kerala").
+       - If no destination exists in history, weave the theme into a broad search string (e.g., "Beach holiday" -> "popular beach tour packages and coastal itineraries").
+    2. Ensure the `rewritten_query` maximizes search accuracy by expanding sparse terms and fixing abbreviations.
 
-    Return ONLY valid, parsable JSON matching the schema.
+    Return ONLY valid, parsable JSON matching the schema precisely. You MUST include `rewritten_query` in every response.
     """
     
     try:
@@ -102,4 +103,4 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
     except Exception as e:
         logger.error(f"❌ [INTENT] All extraction attempts failed: {e}")
         # Return fallback neutral intent and raw query if extraction fails entirely
-        return IntentExtraction(intent="general", rewritten_query=query, destination=[])
+        return IntentExtraction(intent="general", rewritten_query=query, destination=[], theme=None)

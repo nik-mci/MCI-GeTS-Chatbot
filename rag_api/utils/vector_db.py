@@ -11,7 +11,13 @@ from config import settings
 
 # Configure Logging
 import logging
+import threading
+
 logger = logging.getLogger(__name__)
+
+# Module-level configuration for Singleton
+_db_instance = None
+_db_lock = threading.Lock()
 
 # FastEmbed import (will be installed via requirements.txt)
 try:
@@ -55,6 +61,14 @@ class SupabaseDB(VectorDBBase):
                 name=self.collection_name, 
                 dimension=self.dimension
             )
+            
+            # Ensure cosine distance index exists for fast and accurate similarity matching
+            try:
+                logger.info(f"Ensuring cosine distance index exists for {self.collection_name}...")
+                self.collection.create_index(measure=vecs.IndexMeasure.cosine_distance)
+            except Exception as index_e:
+                logger.info(f"Index check complete (it likely already exists): {index_e}")
+                
         except Exception as e:
             if "dimension" in str(e).lower():
                 print(f"⚠️ Dimension mismatch detected ({self.dimension}). Recreating collection '{self.collection_name}'...")
@@ -63,6 +77,7 @@ class SupabaseDB(VectorDBBase):
                     name=self.collection_name, 
                     dimension=self.dimension
                 )
+                self.collection.create_index(measure=vecs.IndexMeasure.cosine_distance)
             else:
                 raise e
 
@@ -183,4 +198,9 @@ class SupabaseDB(VectorDBBase):
             return 0
 
 def get_vector_db() -> VectorDBBase:
-    return SupabaseDB()
+    global _db_instance
+    if _db_instance is None:
+        with _db_lock:
+            if _db_instance is None:
+                _db_instance = SupabaseDB()
+    return _db_instance

@@ -38,14 +38,20 @@ app = FastAPI(
 async def startup_event():
     logger.info("🚀 [STARTUP] GeTS Chatbot Backend is Initializing...")
     
-    # 1. Check Database
+    # 1. Check Database and Embedding Configuration
     try:
+        from config import settings
         from utils.vector_db import get_vector_db
         db = get_vector_db()
         count = db.get_count()
         logger.info(f"✅ [DATABASE] Supabase Connected! Current Vectors: {count}")
+        
+        # Validate Dimension Consistency
+        configured_dim = 384 if settings.EMBEDDING_PROVIDER == "fastembed" else 3072
+        logger.info(f"✅ [DATABASE] Configured Embedding Dimension: {configured_dim} ({settings.EMBEDDING_PROVIDER})")
+        
     except Exception as e:
-        logger.error(f"❌ [DATABASE] Connection Failed: {e}")
+        logger.error(f"❌ [DATABASE] Connection or Configuration Failed: {e}")
 
     # 2. Check AI Providers (Real token test)
     try:
@@ -66,7 +72,8 @@ async def health_check():
     try:
         db = get_vector_db()
         db_count = db.get_count()
-    except:
+    except Exception as e:
+        logger.warning(f"Health check could not retrieve vector count: {e}")
         pass
 
     return {
@@ -282,9 +289,8 @@ async def chat_stream_endpoint(request: ChatRequest):
                 fallback = "I'd love to help you plan a trip! ✈️ Do you have a specific destination in mind (like Kerala or Rajasthan), or a particular theme you're looking for (Family, Honeymoon, Adventure)?"
                 log_observability(request.query, intent_info.dict(), [], fallback)
                 yield f"data: {fallback}\n\n"
-                yield "data: [DONE]\n\n"
                 return
-
+            
             # --- Step 4: Rerank & Check Confidence ---
             ranked_docs = rank_results(raw_results, top_k=10)
             if not ranked_docs:
@@ -292,7 +298,6 @@ async def chat_stream_endpoint(request: ChatRequest):
                 fallback = "I couldn't find specific details for that, but I can suggest some amazing alternatives! Are you looking for a beach holiday, a mountain escape, or a cultural tour?"
                 log_observability(request.query, intent_info.dict(), [], fallback)
                 yield f"data: {fallback}\n\n"
-                yield "data: [DONE]\n\n"
                 return
 
             top_score = ranked_docs[0].get('final_score', 0.0)
@@ -314,14 +319,15 @@ async def chat_stream_endpoint(request: ChatRequest):
             gen_duration = (datetime.utcnow() - gen_start).total_seconds()
             total_duration = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"✅ [STREAM] Completed in {total_duration:.2f}s | Words: {len(full_answer.split())}")
-
             log_observability(request.query, intent_info.dict(), ranked_docs, full_answer)
-            yield "data: [DONE]\n\n"
 
         except Exception as e:
             logger.error(f"🔥 [STREAM-ERROR] Failed for query \"{request.query}\": {str(e)}")
             logger.error(traceback.format_exc())
             yield "data: [ERROR] I'm having trouble right now. Please try again.\n\n"
+        
+        finally:
+            # Ensure safe closure in all paths
             yield "data: [DONE]\n\n"
 
     return StreamingResponse(
