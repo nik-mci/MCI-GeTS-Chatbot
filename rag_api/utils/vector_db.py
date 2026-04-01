@@ -170,13 +170,23 @@ class SupabaseDB(VectorDBBase):
             
             results = []
             for item in response:
-                # vecs query returns [(id, metadata, distance), ...]
-                if isinstance(item, tuple) and len(item) >= 3:
-                    meta = item[1].copy()
-                    # Convert cosine distance to a similarity score (1 - distance)
-                    # Ensuring it stays within [0, 1] range
-                    distance = item[2]
-                    score = max(0.0, 1.0 - float(distance))
+                if isinstance(item, tuple) and len(item) >= 2:
+                    meta = {}
+                    distance = 0.0
+                    
+                    # vecs versions differ: can be (id, distance, meta) or (id, meta, distance)
+                    if len(item) == 3:
+                        if isinstance(item[1], dict):
+                            meta = item[1].copy()
+                            distance = float(item[2])
+                        elif isinstance(item[2], dict):
+                            meta = item[2].copy()
+                            distance = float(item[1])
+                    elif len(item) == 2:
+                        if isinstance(item[1], dict):
+                            meta = item[1].copy()
+                    
+                    score = max(0.0, 1.0 - distance)
                     meta['score'] = score
                     results.append(meta)
             return results
