@@ -155,42 +155,23 @@ async def chat_endpoint(request: ChatRequest):
             logger.info(f"[RETRIEVAL] Found {len(raw_results)} chunks")
 
             if not raw_results:
-                fallback = "I couldn't find exact relevant travel information based on available data. Please refine your query or contact GeTS support for a custom itinerary!"
-                log_observability(request.query, intent_info.dict(), [], fallback)
-                return ChatResponse(
-                    answer=fallback,
-                    sources=[],
-                    confidence="low",
-                    metadata=intent_info
-                )
-
-            ranked_docs = rank_results(raw_results, top_k=10)
-
-            if ranked_docs:
-                top_score = round(ranked_docs[0].get('final_score', 0.0), 4)
-                logger.info(f"[RETRIEVAL] Reranked top score: {top_score}")
-
-                # Hard confidence threshold
-                CONFIDENCE_THRESHOLD = 0.10
-                if top_score < CONFIDENCE_THRESHOLD:
-                    logger.warning(f"[RETRIEVAL] Score {top_score} below threshold {CONFIDENCE_THRESHOLD} — returning fallback")
-                    fallback = "I'd love to help you plan that! 🌍 GeTS Holidays specializes in incredible India tours. Do you have a specific destination in mind, or would you like to explore popular spots like Kerala, Rajasthan, or the Golden Triangle?"
-                    log_observability(request.query, intent_info.dict(), [], fallback)
-                    return ChatResponse(
-                        answer=fallback,
-                        sources=[],
-                        confidence="low",
-                        metadata=intent_info
-                    )
+                logger.warning(f"[RETRIEVAL] Zero results found for: \"{request.query}\"")
+                ranked_docs = []
             else:
-                fallback = "I couldn't find exact relevant travel information based on available data. Please refine your query or contact GeTS support!"
-                log_observability(request.query, intent_info.dict(), [], fallback)
-                return ChatResponse(
-                    answer=fallback,
-                    sources=[],
-                    confidence="low",
-                    metadata=intent_info
-                )
+                ranked_docs = rank_results(raw_results, top_k=10)
+                
+                if ranked_docs:
+                    top_score = round(ranked_docs[0].get('final_score', 0.0), 4)
+                    logger.info(f"[RETRIEVAL] Reranked top score: {top_score}")
+
+                    # Hard confidence threshold
+                    CONFIDENCE_THRESHOLD = 0.10
+                    if top_score < CONFIDENCE_THRESHOLD:
+                        logger.warning(f"[RETRIEVAL] Score {top_score} below threshold {CONFIDENCE_THRESHOLD} — deferring to LLM")
+                        ranked_docs = []  # Clear docs to force LLM graceful pivot
+                else:
+                    logger.warning("[RETRIEVAL] No docs passed reranking filters — deferring to LLM")
+                    ranked_docs = []
         else:
             logger.info("ℹ️ [RETRIEVAL] Skipped Vector DB search for generic conversational intent.")
 
@@ -287,21 +268,18 @@ async def chat_stream_endpoint(request: ChatRequest):
                 
                 if not raw_results:
                     logger.warning(f"⚠️ [STREAM] Zero results found for: \"{request.query}\"")
-                    fallback = "I'd love to help you plan a trip! ✈️ Do you have a specific destination in mind (like Kerala or Rajasthan), or a particular theme you're looking for (Family, Honeymoon, Adventure)?"
-                    log_observability(request.query, intent_info.dict(), [], fallback)
-                    yield f"data: {fallback}\n\n"
-                    return
-                
-                ranked_docs = rank_results(raw_results, top_k=10)
-                if not ranked_docs:
-                    logger.warning("⚠️ [STREAM] No docs passed reranking filters")
-                    fallback = "I couldn't find specific details for that, but I can suggest some amazing alternatives! Are you looking for a beach holiday, a mountain escape, or a cultural tour?"
-                    log_observability(request.query, intent_info.dict(), [], fallback)
-                    yield f"data: {fallback}\n\n"
-                    return
-
-                top_score = ranked_docs[0].get('final_score', 0.0)
-                logger.info(f"📊 [STREAM] Top Match Score: {top_score:.4f} (Threshold: 0.10)")
+                    ranked_docs = []
+                else:
+                    ranked_docs = rank_results(raw_results, top_k=10)
+                    if not ranked_docs:
+                        logger.warning("⚠️ [STREAM] No docs passed reranking filters")
+                        ranked_docs = []
+                    else:
+                        top_score = ranked_docs[0].get('final_score', 0.0)
+                        logger.info(f"📊 [STREAM] Top Match Score: {top_score:.4f} (Threshold: 0.10)")
+                        if top_score < 0.10:
+                            logger.warning(f"⚠️ [STREAM] Score {top_score} below threshold — deferring to LLM")
+                            ranked_docs = []
             else:
                 logger.info("ℹ️ [STREAM] Skipped Vector DB search for generic conversational intent.")
 
