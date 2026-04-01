@@ -137,46 +137,53 @@ async def chat_endpoint(request: ChatRequest):
         conversation_history = getattr(request, "conversation_history", []) or []
         intent_info = await extract_intent_and_entities(request.query, history=conversation_history)
         
-        # Now run retrieval with the extracted intent
-        loop = asyncio.get_event_loop()
-        raw_results = await loop.run_in_executor(
-            executor,
-            retrieve_context,
-            request.query,
-            intent_info
-        )
-
-        logger.info(f"[INTENT] Extracted: destination={intent_info.destination}, budget={intent_info.budget}, duration={intent_info.duration}")
-        logger.info(f"[RETRIEVAL] Found {len(raw_results)} chunks")
+        logger.info(f"[INTENT] Extracted: destination={intent_info.destination}, intent={intent_info.intent}, rewritten='{intent_info.rewritten_query}'")
 
         # ----------------------------------------------------------------
-        # Step 2: Empty fallback — if retrieval returned nothing
+        # Step 2: Conditional Retrieval & Re-ranking
         # ----------------------------------------------------------------
-        if not raw_results:
-            fallback = "I couldn't find exact relevant travel information based on available data. Please refine your query or contact GeTS support for a custom itinerary!"
-            log_observability(request.query, intent_info.dict(), [], fallback)
-            return ChatResponse(
-                answer=fallback,
-                sources=[],
-                confidence="low",
-                metadata=intent_info
+        ranked_docs = []
+        if intent_info.rewritten_query.strip():
+            # Run retrieval with the extracted intent
+            loop = asyncio.get_event_loop()
+            raw_results = await loop.run_in_executor(
+                executor,
+                retrieve_context,
+                request.query,
+                intent_info
             )
+            logger.info(f"[RETRIEVAL] Found {len(raw_results)} chunks")
 
-        # ----------------------------------------------------------------
-        # Step 3: Re-rank results (increased top_k to provide more context)
-        # ----------------------------------------------------------------
-        ranked_docs = rank_results(raw_results, top_k=10)
+            if not raw_results:
+                fallback = "I couldn't find exact relevant travel information based on available data. Please refine your query or contact GeTS support for a custom itinerary!"
+                log_observability(request.query, intent_info.dict(), [], fallback)
+                return ChatResponse(
+                    answer=fallback,
+                    sources=[],
+                    confidence="low",
+                    metadata=intent_info
+                )
 
-        if ranked_docs:
-            top_score = round(ranked_docs[0].get('final_score', 0.0), 4)
-            logger.info(f"[RETRIEVAL] Reranked top score: {top_score}")
+            ranked_docs = rank_results(raw_results, top_k=10)
 
-            # Hard confidence threshold — if best match is too weak,
-            # skip LLM generation entirely and return honest fallback
-            CONFIDENCE_THRESHOLD = 0.10
-            if top_score < CONFIDENCE_THRESHOLD:
-                logger.warning(f"[RETRIEVAL] Score {top_score} below threshold {CONFIDENCE_THRESHOLD} — returning fallback")
-                fallback = "I'd love to help you plan that! 🌍 GeTS Holidays specializes in incredible India tours. Do you have a specific destination in mind, or would you like to explore popular spots like Kerala, Rajasthan, or the Golden Triangle?"
+            if ranked_docs:
+                top_score = round(ranked_docs[0].get('final_score', 0.0), 4)
+                logger.info(f"[RETRIEVAL] Reranked top score: {top_score}")
+
+                # Hard confidence threshold
+                CONFIDENCE_THRESHOLD = 0.10
+                if top_score < CONFIDENCE_THRESHOLD:
+                    logger.warning(f"[RETRIEVAL] Score {top_score} below threshold {CONFIDENCE_THRESHOLD} — returning fallback")
+                    fallback = "I'd love to help you plan that! 🌍 GeTS Holidays specializes in incredible India tours. Do you have a specific destination in mind, or would you like to explore popular spots like Kerala, Rajasthan, or the Golden Triangle?"
+                    log_observability(request.query, intent_info.dict(), [], fallback)
+                    return ChatResponse(
+                        answer=fallback,
+                        sources=[],
+                        confidence="low",
+                        metadata=intent_info
+                    )
+            else:
+                fallback = "I couldn't find exact relevant travel information based on available data. Please refine your query or contact GeTS support!"
                 log_observability(request.query, intent_info.dict(), [], fallback)
                 return ChatResponse(
                     answer=fallback,
@@ -185,17 +192,10 @@ async def chat_endpoint(request: ChatRequest):
                     metadata=intent_info
                 )
         else:
-            fallback = "I couldn't find exact relevant travel information based on available data. Please refine your query or contact GeTS support!"
-            log_observability(request.query, intent_info.dict(), [], fallback)
-            return ChatResponse(
-                answer=fallback,
-                sources=[],
-                confidence="low",
-                metadata=intent_info
-            )
+            logger.info("ℹ️ [RETRIEVAL] Skipped Vector DB search for generic conversational intent.")
 
         # ----------------------------------------------------------------
-        # Step 4: Generate response — pass conversation_history from request
+        # Step 3: Generate response — pass conversation_history from request
         # ----------------------------------------------------------------
         gen_start = datetime.utcnow()
 
@@ -272,38 +272,40 @@ async def chat_stream_endpoint(request: ChatRequest):
             conversation_history = getattr(request, "conversation_history", []) or []
             intent_info = await extract_intent_and_entities(request.query, history=conversation_history)
             
-            # --- Step 2: Retrieval (In Executor) ---
-            loop = asyncio.get_event_loop()
-            raw_results = await loop.run_in_executor(
-                executor,
-                retrieve_context,
-                request.query,
-                intent_info
-            )
-            
-            logger.info(f"🔎 [STREAM] Found {len(raw_results)} raw results from search")
-            
-            # --- Step 3: Handle Zero Results ---
-            if not raw_results:
-                logger.warning(f"⚠️ [STREAM] Zero results found for: \"{request.query}\"")
-                fallback = "I'd love to help you plan a trip! ✈️ Do you have a specific destination in mind (like Kerala or Rajasthan), or a particular theme you're looking for (Family, Honeymoon, Adventure)?"
-                log_observability(request.query, intent_info.dict(), [], fallback)
-                yield f"data: {fallback}\n\n"
-                return
-            
-            # --- Step 4: Rerank & Check Confidence ---
-            ranked_docs = rank_results(raw_results, top_k=10)
-            if not ranked_docs:
-                logger.warning("⚠️ [STREAM] No docs passed reranking filters")
-                fallback = "I couldn't find specific details for that, but I can suggest some amazing alternatives! Are you looking for a beach holiday, a mountain escape, or a cultural tour?"
-                log_observability(request.query, intent_info.dict(), [], fallback)
-                yield f"data: {fallback}\n\n"
-                return
+            # --- Step 2: Conditional Retrieval ---
+            ranked_docs = []
+            if intent_info.rewritten_query.strip():
+                loop = asyncio.get_event_loop()
+                raw_results = await loop.run_in_executor(
+                    executor,
+                    retrieve_context,
+                    request.query,
+                    intent_info
+                )
+                
+                logger.info(f"🔎 [STREAM] Found {len(raw_results)} raw results from search")
+                
+                if not raw_results:
+                    logger.warning(f"⚠️ [STREAM] Zero results found for: \"{request.query}\"")
+                    fallback = "I'd love to help you plan a trip! ✈️ Do you have a specific destination in mind (like Kerala or Rajasthan), or a particular theme you're looking for (Family, Honeymoon, Adventure)?"
+                    log_observability(request.query, intent_info.dict(), [], fallback)
+                    yield f"data: {fallback}\n\n"
+                    return
+                
+                ranked_docs = rank_results(raw_results, top_k=10)
+                if not ranked_docs:
+                    logger.warning("⚠️ [STREAM] No docs passed reranking filters")
+                    fallback = "I couldn't find specific details for that, but I can suggest some amazing alternatives! Are you looking for a beach holiday, a mountain escape, or a cultural tour?"
+                    log_observability(request.query, intent_info.dict(), [], fallback)
+                    yield f"data: {fallback}\n\n"
+                    return
 
-            top_score = ranked_docs[0].get('final_score', 0.0)
-            logger.info(f"📊 [STREAM] Top Match Score: {top_score:.4f} (Threshold: 0.10)")
+                top_score = ranked_docs[0].get('final_score', 0.0)
+                logger.info(f"📊 [STREAM] Top Match Score: {top_score:.4f} (Threshold: 0.10)")
+            else:
+                logger.info("ℹ️ [STREAM] Skipped Vector DB search for generic conversational intent.")
 
-            # --- Step 5: Stream Generation ---
+            # --- Step 3: Stream Generation ---
             gen_start = datetime.utcnow()
             full_answer = ""
 

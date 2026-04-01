@@ -44,6 +44,7 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
        - If a destination was mentioned, weave the theme into the rewritten query (e.g., "Family trip" + previous "Kerala" -> "family tour packages in Kerala").
        - If no destination exists in history, weave the theme into a broad search string (e.g., "Beach holiday" -> "popular beach tour packages and coastal itineraries").
     2. Ensure the `rewritten_query` maximizes search accuracy by expanding sparse terms and fixing abbreviations.
+    3. If the user's query is a simple greeting, conversational filler, or lacks any travel intent (e.g., "hi", "thanks", "ok", "huh"), set `rewritten_query` to an empty string "" and set `intent` to "general". Do not invent a search query.
 
     Return ONLY valid, parsable JSON matching the schema precisely. You MUST include `rewritten_query` in every response.
     """
