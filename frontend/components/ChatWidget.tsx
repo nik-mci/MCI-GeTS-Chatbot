@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, Globe, AlertCircle } from 'lucide-react';
+import { MessageCircle, X, Send, Globe, AlertCircle, Phone, PhoneCall, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ItineraryCard, { ItineraryCardData } from './ItineraryCard';
 
@@ -313,27 +313,33 @@ export default function ChatWidget() {
 
             {/* CTA Strip — shown after bot has sent its second response */}
             {messages.filter(m => m.sender === 'bot').length >= 2 && (
-              <div className="flex gap-2 px-3 py-2 bg-white border-t border-slate-100 flex-shrink-0">
-                <a
-                  href="tel:+919910903434"
-                  className="flex-1 flex items-center justify-center gap-1 rounded text-[11px] font-semibold text-white py-2 px-1"
-                  style={{ background: '#1a4a3a' }}
-                >
-                  📞 Mobile
-                </a>
-                <a
-                  href="tel:+911246585800"
-                  className="flex-1 flex items-center justify-center gap-1 rounded text-[11px] font-semibold text-white py-2 px-1"
-                  style={{ background: '#1a4a3a' }}
-                >
-                  ☎️ Landline
-                </a>
-                <a
-                  href="mailto:info@getsholidays.com"
-                  className="flex-1 flex items-center justify-center gap-1 rounded text-[11px] font-semibold text-slate-700 py-2 px-1 border border-slate-200 bg-white"
-                >
-                  ✉️ Email
-                </a>
+              <div className="px-3 pt-2.5 pb-2 bg-white border-t border-slate-100 flex-shrink-0">
+                <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-widest text-center mb-2">
+                  Talk to our travel experts
+                </p>
+                <div className="flex gap-2">
+                  <a
+                    href="tel:+919910903434"
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-[#CC0000] hover:bg-[#CC0000] transition-all group"
+                  >
+                    <Phone size={13} className="text-[#CC0000] group-hover:text-white transition-colors" />
+                    <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Mobile</span>
+                  </a>
+                  <a
+                    href="tel:+911246585800"
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-[#CC0000] hover:bg-[#CC0000] transition-all group"
+                  >
+                    <PhoneCall size={13} className="text-[#CC0000] group-hover:text-white transition-colors" />
+                    <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Landline</span>
+                  </a>
+                  <a
+                    href="mailto:info@getsholidays.com"
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-slate-200 hover:border-[#CC0000] hover:bg-[#CC0000] transition-all group"
+                  >
+                    <Mail size={13} className="text-slate-400 group-hover:text-white transition-colors" />
+                    <span className="text-[10px] font-semibold text-slate-400 group-hover:text-white transition-colors">Email</span>
+                  </a>
+                </div>
               </div>
             )}
 

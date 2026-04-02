@@ -92,42 +92,10 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'faqs', label: 'FAQs' },
 ];
 
-// ── Toast ─────────────────────────────────────────────────────────────────────
-
-function Toast({ visible }: { visible: boolean }) {
-  if (!visible) return null;
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        top: 8,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: '#1a4a3a',
-        color: '#fff',
-        fontSize: 11,
-        padding: '6px 14px',
-        borderRadius: 8,
-        whiteSpace: 'nowrap',
-        zIndex: 10,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-      }}
-    >
-      Our team will email this to you shortly
-    </div>
-  );
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
-  const [toastVisible, setToastVisible] = useState(false);
-
-  const handlePdf = () => {
-    setToastVisible(true);
-    setTimeout(() => setToastVisible(false), 3000);
-  };
 
   return (
     <div
@@ -142,45 +110,20 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
         maxWidth: 320,
       }}
     >
-      <Toast visible={toastVisible} />
-
       {/* ── Header ── */}
       <div
         style={{
           background: '#1a4a3a',
           color: '#fff',
           padding: '12px 14px 10px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 8,
         }}
       >
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: 0.2 }}>
-            {data.destination}
-          </div>
-          <div style={{ fontSize: 10.5, opacity: 0.82, marginTop: 2 }}>
-            {formatDate(data.dateFrom)} – {formatDate(data.dateTo)}
-          </div>
+        <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: 0.2 }}>
+          {data.destination}
         </div>
-        <button
-          onClick={handlePdf}
-          style={{
-            background: 'rgba(255,255,255,0.15)',
-            border: '1px solid rgba(255,255,255,0.35)',
-            color: '#fff',
-            borderRadius: 6,
-            padding: '4px 9px',
-            fontSize: 10.5,
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            fontWeight: 600,
-            flexShrink: 0,
-          }}
-        >
-          ⬇ PDF
-        </button>
+        <div style={{ fontSize: 10.5, opacity: 0.82, marginTop: 2 }}>
+          {formatDate(data.dateFrom)} – {formatDate(data.dateTo)}
+        </div>
       </div>
 
       {/* ── Tabs ── */}
