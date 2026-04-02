@@ -2,9 +2,21 @@ from utils.vector_db import get_vector_db
 from models.schemas import IntentExtraction
 from typing import List, Dict, Any
 from config import settings
+import logging
 import re
 
-db = get_vector_db()
+logger = logging.getLogger(__name__)
+
+_db = None
+
+def _get_db():
+    global _db
+    if _db is None:
+        try:
+            _db = get_vector_db()
+        except Exception as e:
+            logger.error(f"❌ [RETRIEVAL] Vector DB init failed: {e}")
+    return _db
 
 def filter_by_metadata(items: List[Dict[str, Any]], intent_data: IntentExtraction) -> List[Dict[str, Any]]:
     """Filters and dynamically adjust scores based on extracted intents and metadata."""
@@ -63,13 +75,16 @@ def filter_by_metadata(items: List[Dict[str, Any]], intent_data: IntentExtractio
 
 def retrieve_context(query: str, intent_data: IntentExtraction = None) -> List[Dict[str, Any]]:
     """Retrieves context using semantic search and applies business logic filters."""
+    db = _get_db()
+    if db is None:
+        logger.warning("⚠️ [RETRIEVAL] Vector DB unavailable — returning empty results")
+        return []
+
     # Step A: Use Rewritten Query if available for accuracy, else fallback to raw query
     search_string = query
     if intent_data and intent_data.rewritten_query:
         search_string = intent_data.rewritten_query
-    
-    import logging
-    logger = logging.getLogger(__name__)
+
     logger.info(f"🔍 [RETRIEVAL] Querying Vector DB with: \"{search_string}\"")
 
     # Step B: Increase retrieval depth to 50
