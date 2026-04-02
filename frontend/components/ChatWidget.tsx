@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, Globe, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ItineraryCard, { ItineraryCardData } from './ItineraryCard';
 
 interface Message {
   id: string;
@@ -21,6 +22,22 @@ export default function ChatWidget() {
   const [error, setError] = useState<string | null>(null);
   const [notificationCount, setNotificationCount] = useState(1);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Only attempt to parse the card once the full delimiters have arrived
+  function parseItineraryCard(text: string): { cardData: ItineraryCardData | null; cleanText: string } {
+    if (!text.includes('<<<ITINERARY_CARD>>>') || !text.includes('<<<END_ITINERARY_CARD>>>')) {
+      return { cardData: null, cleanText: text };
+    }
+    const match = text.match(/<<<ITINERARY_CARD>>>([\s\S]*?)<<<END_ITINERARY_CARD>>>/);
+    if (!match) return { cardData: null, cleanText: text };
+    try {
+      const cardData = JSON.parse(match[1].trim()) as ItineraryCardData;
+      const cleanText = text.replace(/<<<ITINERARY_CARD>>>[\s\S]*?<<<END_ITINERARY_CARD>>>/, '').trim();
+      return { cardData, cleanText };
+    } catch {
+      return { cardData: null, cleanText: text };
+    }
+  }
 
   // Initial welcome message
   useEffect(() => {
@@ -196,26 +213,41 @@ export default function ChatWidget() {
 
             {/* Messages Area - Ensuring clean scrollbar */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-scrollbar bg-[#f8fafc]">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`max-w-[80%] flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
-                    <div
-                      className={`px-4 py-2 rounded-2xl text-[13.5px] leading-relaxed shadow-sm ${msg.sender === 'user'
-                          ? 'bg-[#CC0000] text-white rounded-tr-none'
-                          : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
-                        }`}
-                    >
-                      {msg.text}
+              {messages.map((msg) => {
+                if (msg.sender === 'bot') {
+                  const { cardData, cleanText } = parseItineraryCard(msg.text);
+                  return (
+                    <div key={msg.id} className="flex justify-start">
+                      <div className="max-w-[80%] flex flex-col items-start" style={{ maxWidth: '90%' }}>
+                        {cardData && <ItineraryCard data={cardData} />}
+                        {cleanText.length > 0 && (
+                          <div className="px-4 py-2 rounded-2xl text-[13.5px] leading-relaxed shadow-sm bg-white text-slate-800 border border-slate-100 rounded-tl-none" style={{ marginTop: cardData ? 6 : 0 }}>
+                            {cleanText}
+                          </div>
+                        )}
+                        <span className="text-[9px] text-slate-400 mt-1 uppercase font-medium tracking-wider">
+                          {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-[9px] text-slate-400 mt-1 uppercase font-medium tracking-wider">
-                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                  );
+                }
+                return (
+                  <div
+                    key={msg.id}
+                    className="flex justify-end"
+                  >
+                    <div className="max-w-[80%] flex flex-col items-end">
+                      <div className="px-4 py-2 rounded-2xl text-[13.5px] leading-relaxed shadow-sm bg-[#CC0000] text-white rounded-tr-none">
+                        {msg.text}
+                      </div>
+                      <span className="text-[9px] text-slate-400 mt-1 uppercase font-medium tracking-wider">
+                        {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {isLoading && (
                 <div className="flex justify-start">
@@ -251,6 +283,32 @@ export default function ChatWidget() {
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* CTA Strip — shown after bot has sent its second response */}
+            {messages.filter(m => m.sender === 'bot').length >= 2 && (
+              <div className="flex gap-2 px-3 py-2 bg-white border-t border-slate-100">
+                <a
+                  href="tel:+919910903434"
+                  className="flex-1 flex items-center justify-center gap-1 rounded-lg text-[11px] font-semibold text-white py-2 px-1"
+                  style={{ background: '#1a4a3a' }}
+                >
+                  📞 Mobile
+                </a>
+                <a
+                  href="tel:+911246585800"
+                  className="flex-1 flex items-center justify-center gap-1 rounded-lg text-[11px] font-semibold text-white py-2 px-1"
+                  style={{ background: '#1a4a3a' }}
+                >
+                  ☎️ Landline
+                </a>
+                <a
+                  href="mailto:info@getsholidays.com"
+                  className="flex-1 flex items-center justify-center gap-1 rounded-lg text-[11px] font-semibold text-slate-700 py-2 px-1 border border-slate-200 bg-white"
+                >
+                  ✉️ Email
+                </a>
+              </div>
+            )}
 
             {/* Input Area */}
             <div className="p-3 sm:p-4 bg-white border-t border-slate-100">
