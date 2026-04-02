@@ -1,6 +1,8 @@
 import os
 from pydantic_settings import BaseSettings
 
+_env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+
 class Settings(BaseSettings):
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
@@ -13,17 +15,17 @@ class Settings(BaseSettings):
     QA_PAIRS_PATH: str = "../output/qa_pairs.json"
     SCRAPED_PAGES_PATH: str = "../data/raw/scraped_pages.json"
     ITINERARY_DOCS_PATH: str = "../GeTS Itineraries"
-    
+
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
     SUPABASE_CONNECTION_STRING: str = os.getenv("SUPABASE_CONNECTION_STRING", "")
-    
+
     # Vector DB Support
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")
     PINECONE_INDEX_NAME: str = os.getenv("PINECONE_INDEX_NAME", "gets-travel-index")
-    
+
     model_config = {
-        "env_file": ".env",
+        "env_file": _env_file,
         "extra": "ignore"
     }
 

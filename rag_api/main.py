@@ -1,3 +1,11 @@
+import sys
+import os
+
+# Load .env before any other imports so all settings pick up the values
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from dotenv import load_dotenv
+load_dotenv(os.path.join(_root, ".env"))
+
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -10,8 +18,6 @@ from datetime import datetime
 import traceback
 from config import settings
 
-import sys
-import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from models.schemas import ChatRequest, ChatResponse, SourceDocument
