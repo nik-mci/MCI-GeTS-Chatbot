@@ -19,7 +19,12 @@ logger = logging.getLogger(__name__)
 _db_instance = None
 _db_lock = threading.Lock()
 
-# SentenceTransformers import
+# Embedding imports — fastembed preferred (ONNX, small), sentence-transformers as fallback
+try:
+    from fastembed import TextEmbedding as FastEmbedding
+except ImportError:
+    FastEmbedding = None
+
 try:
     from sentence_transformers import SentenceTransformer
 except ImportError:
@@ -41,10 +46,16 @@ class SupabaseDB(VectorDBBase):
         self.provider = settings.EMBEDDING_PROVIDER
         
         if self.provider in ("fastembed", "sentence-transformers"):
-            if SentenceTransformer is None:
-                raise ImportError("sentence-transformers is not installed. Run: pip install sentence-transformers")
-            print(f"Initializing SentenceTransformer ({settings.FASTEMBED_MODEL})...")
-            self.model = SentenceTransformer(settings.FASTEMBED_MODEL)
+            if FastEmbedding is not None:
+                print(f"Initializing FastEmbed ({settings.FASTEMBED_MODEL})...")
+                self.model = FastEmbedding(model_name=settings.FASTEMBED_MODEL)
+                self._use_fastembed = True
+            elif SentenceTransformer is not None:
+                print(f"Initializing SentenceTransformer ({settings.FASTEMBED_MODEL})...")
+                self.model = SentenceTransformer(settings.FASTEMBED_MODEL)
+                self._use_fastembed = False
+            else:
+                raise ImportError("Neither fastembed nor sentence-transformers is installed.")
             self.dimension = 384
         else:
             self.model_name = settings.GEMINI_EMBEDDING_MODEL
@@ -83,6 +94,8 @@ class SupabaseDB(VectorDBBase):
     def get_embedding(self, text: str) -> List[float]:
         try:
             if self.provider in ("fastembed", "sentence-transformers"):
+                if self._use_fastembed:
+                    return list(self.model.embed([text]))[0].tolist()
                 return self.model.encode(text).tolist()
             else:
                 result = genai.embed_content(
@@ -101,8 +114,12 @@ class SupabaseDB(VectorDBBase):
         try:
             embeddings = []
             if self.provider in ("fastembed", "sentence-transformers"):
-                print(f"Embedding batch of {len(texts)} using SentenceTransformer...")
-                embeddings = [e.tolist() for e in self.model.encode(texts)]
+                if self._use_fastembed:
+                    print(f"Embedding batch of {len(texts)} using FastEmbed...")
+                    embeddings = [e.tolist() for e in self.model.embed(texts)]
+                else:
+                    print(f"Embedding batch of {len(texts)} using SentenceTransformer...")
+                    embeddings = [e.tolist() for e in self.model.encode(texts)]
             else:
                 # Gemini Cloud fallback
                 MAX_RETRIES = 10
