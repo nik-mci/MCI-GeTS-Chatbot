@@ -121,9 +121,6 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
         <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: 0.2 }}>
           {data.destination}
         </div>
-        <div style={{ fontSize: 10.5, opacity: 0.82, marginTop: 2 }}>
-          {formatDate(data.dateFrom)} – {formatDate(data.dateTo)}
-        </div>
       </div>
 
       {/* ── Tabs ── */}

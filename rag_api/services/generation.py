@@ -114,9 +114,7 @@ Format:
 <<<ITINERARY_CARD>>>
 {
   "destination": "Destination Name",
-  "dateFrom": "YYYY-MM-DD",
-  "dateTo": "YYYY-MM-DD",
-  "overview": "2–3 sentences about the destination and the best season to visit. 
+  "overview": "2–3 sentences about the destination and the best season to visit.
                Warm and inspiring, not encyclopedic.",
   "days": <integer>,
   "attractions": <integer>,
@@ -172,8 +170,6 @@ ITINERARY CARD — DATA RULES
 - Price bands must come from your pricing objects, not estimated freely
 - If no pricing data exists for a destination, use: "priceFrom": 0, "priceTo": 0 
   and set "priceNote" to "Our team will provide exact pricing based on your dates and group size."
-- dateFrom / dateTo: if the user has not given dates, use today + 30 days as a placeholder
-  and note in your conversational text that dates are illustrative
 - weather icons: use only "sunny", "cloudy", or "rain"
 - dailyPlan: always include at least 2 day blocks, max 7
 - faqs: always include at least 2, max 4
@@ -343,7 +339,10 @@ def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_hi
     stage = _detect_stage(conversation_history, ranked_docs)
     stage_line = _STAGE_GUIDANCE[stage]
 
-    return f"CONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\n{stage_line}\n\nCURRENT USER MESSAGE:\n{query}"
+    from datetime import date
+    today = date.today().strftime("%d %B %Y")
+
+    return f"TODAY'S DATE: {today}\n\nCONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\n{stage_line}\n\nCURRENT USER MESSAGE:\n{query}"
 
 async def generate_response(
     query: str,

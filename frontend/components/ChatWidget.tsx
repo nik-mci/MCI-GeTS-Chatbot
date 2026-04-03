@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, Globe, AlertCircle, Phone, PhoneCall, Mail, Trash2 } from 'lucide-react';
+import { MessageCircle, X, Send, Globe, AlertCircle, Phone, Mail, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ItineraryCard, { ItineraryCardData } from './ItineraryCard';
 import LeadForm from './LeadForm';
@@ -105,20 +105,30 @@ export default function ChatWidget() {
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Only attempt to parse the card once the full delimiters have arrived
-  function parseItineraryCard(text: string): { cardData: ItineraryCardData | null; cleanText: string } {
-    if (!text.includes('<<<ITINERARY_CARD>>>') || !text.includes('<<<END_ITINERARY_CARD>>>')) {
-      return { cardData: null, cleanText: text };
+  function parseItineraryCard(text: string): { cardData: ItineraryCardData | null; cleanText: string; cardLoading: boolean } {
+    const hasOpen = text.includes('<<<ITINERARY_CARD>>>');
+    const hasClose = text.includes('<<<END_ITINERARY_CARD>>>');
+
+    // Card is mid-stream — hide raw JSON, show placeholder
+    if (hasOpen && !hasClose) {
+      const beforeCard = text.split('<<<ITINERARY_CARD>>>')[0].trim();
+      return { cardData: null, cleanText: beforeCard, cardLoading: true };
     }
-    const match = text.match(/<<<ITINERARY_CARD>>>([\s\S]*?)<<<END_ITINERARY_CARD>>>/);
-    if (!match) return { cardData: null, cleanText: text };
-    try {
-      const cardData = JSON.parse(match[1].trim()) as ItineraryCardData;
-      const cleanText = text.replace(/<<<ITINERARY_CARD>>>[\s\S]*?<<<END_ITINERARY_CARD>>>/, '').trim();
-      return { cardData, cleanText };
-    } catch {
-      return { cardData: null, cleanText: text };
+
+    // Card fully arrived — parse it
+    if (hasOpen && hasClose) {
+      const match = text.match(/<<<ITINERARY_CARD>>>([\s\S]*?)<<<END_ITINERARY_CARD>>>/);
+      if (!match) return { cardData: null, cleanText: text, cardLoading: false };
+      try {
+        const cardData = JSON.parse(match[1].trim()) as ItineraryCardData;
+        const cleanText = text.replace(/<<<ITINERARY_CARD>>>[\s\S]*?<<<END_ITINERARY_CARD>>>/, '').trim();
+        return { cardData, cleanText, cardLoading: false };
+      } catch {
+        return { cardData: null, cleanText: text, cardLoading: false };
+      }
     }
+
+    return { cardData: null, cleanText: text, cardLoading: false };
   }
 
   // Restore session from localStorage on mount, or start fresh
@@ -419,7 +429,7 @@ export default function ChatWidget() {
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-[#f7f7f7] chat-scrollbar">
               {messages.map((msg) => {
                 if (msg.sender === 'bot') {
-                  const { cardData, cleanText } = parseItineraryCard(msg.text);
+                  const { cardData, cleanText, cardLoading } = parseItineraryCard(msg.text);
                   return (
                     <div key={msg.id} className="flex items-start gap-2.5">
                       <BotAvatar />
@@ -427,11 +437,22 @@ export default function ChatWidget() {
                         {cleanText.length > 0 && (
                           <div
                             className="bg-white px-3 py-2.5 text-[13px] leading-relaxed text-slate-800 shadow-sm border border-slate-100"
-                            style={{ borderRadius: '0 8px 8px 8px', marginBottom: cardData ? 6 : 0 }}
+                            style={{ borderRadius: '0 8px 8px 8px', marginBottom: (cardData || cardLoading) ? 6 : 0 }}
                           >
                             {cleanText.split('\n').map((line, i, arr) => (
                               <span key={i}>{line}{i < arr.length - 1 && <br />}</span>
                             ))}
+                          </div>
+                        )}
+                        {cardLoading && (
+                          <div
+                            className="bg-white border border-slate-100 shadow-sm px-4 py-3 flex gap-1.5 items-center"
+                            style={{ borderRadius: 14, width: '100%', maxWidth: 320 }}
+                          >
+                            <div className="w-1.5 h-1.5 bg-slate-300 rounded-full dot-pulse" style={{ animationDelay: '0s' }} />
+                            <div className="w-1.5 h-1.5 bg-slate-300 rounded-full dot-pulse" style={{ animationDelay: '0.2s' }} />
+                            <div className="w-1.5 h-1.5 bg-slate-300 rounded-full dot-pulse" style={{ animationDelay: '0.4s' }} />
+                            <span className="text-[11px] text-slate-400 ml-1">Building your itinerary…</span>
                           </div>
                         )}
                         {cardData && <ItineraryCard data={cardData} />}
@@ -521,14 +542,7 @@ export default function ChatWidget() {
                     <Phone size={13} className="text-[#CC0000] group-hover:text-white transition-colors" />
                     <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Mobile</span>
                   </a>
-                  <a
-                    href="tel:+911246585800"
-                    className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-[#CC0000] hover:bg-[#CC0000] transition-all group"
-                  >
-                    <PhoneCall size={13} className="text-[#CC0000] group-hover:text-white transition-colors" />
-                    <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Landline</span>
-                  </a>
-                  <a
+                  <
                     href={`https://wa.me/${WHATSAPP_NUMBER}`}
                     target="_blank"
                     rel="noopener noreferrer"
