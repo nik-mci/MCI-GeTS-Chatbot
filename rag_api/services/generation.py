@@ -55,6 +55,17 @@ QUESTION SEQUENCING — STRICT RULES
   or later in the year?" — not "What is your travel date?"
 
 ════════════════════════════════════════
+TRUST FACTS — USE THESE WHEN RELEVANT
+════════════════════════════════════════
+These are verified facts about GeTS Holidays. Reference them naturally when a user
+expresses hesitation, asks about safety, reliability, or why they should trust GeTS:
+- Rated Excellent by 100+ travellers on TripAdvisor
+- Winner of the National Tourism Award
+- GeTS Holidays has on-ground teams across India available 24/7
+- All tours are fully customisable — no fixed group sizes or rigid schedules
+- GeTS handles all logistics: transport, guides, hotels, and any last-minute changes
+
+════════════════════════════════════════
 MICRO-EXPERTISE CUES — USE THESE NATURALLY
 ════════════════════════════════════════
 Weave in local knowledge before the contact ask. Examples:
@@ -269,21 +280,25 @@ _STAGE_GUIDANCE = {
     ),
 }
 
-def _detect_stage(conversation_history: List[Dict[str, str]], ranked_docs: List[Dict[str, Any]]) -> str:
+def _detect_stage(conversation_history: List[Dict[str, str]], ranked_docs: List[Dict[str, Any]], card_shown: bool = False) -> str:
     """Rule-based stage detection from conversation history."""
     bot_messages = [m.get("content", "") for m in conversation_history if m.get("role") == "assistant"]
     msg_count = len(conversation_history)
 
     # HANDOFF: contact already requested
-    if any("could we get your name" in m.lower() for m in bot_messages):
+    handoff_signals = [
+        "could we get your name", "could we have your name",
+        "best number to reach you", "our team would love to reach out",
+        "to put together a personalised quote", "to put together a personalized quote",
+    ]
+    if any(signal in m.lower() for m in bot_messages for signal in handoff_signals):
         return "handoff"
 
-    # CONVERSION: itinerary card was shown and conversation is substantive
-    card_shown = any("ITINERARY_CARD" in m for m in bot_messages)
+    # CONVERSION: card was shown (reliable signal from frontend) and conversation is substantive
     if card_shown and msg_count >= 4:
         return "conversion"
 
-    # VALUE: retrieval found relevant docs OR destination was mentioned AND conversation is underway
+    # VALUE: retrieval found relevant docs and conversation is underway
     if ranked_docs and msg_count >= 2:
         return "value"
     if msg_count >= 4:
@@ -291,7 +306,7 @@ def _detect_stage(conversation_history: List[Dict[str, str]], ranked_docs: List[
 
     return "discovery"
 
-def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_history: List[Dict[str, str]]) -> str:
+def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_history: List[Dict[str, str]], card_shown: bool = False) -> str:
     # --- Build context ---
     TOP_K_CHUNKS = 10
     MAX_WORDS_PER_CHUNK = 300
@@ -336,7 +351,7 @@ def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_hi
                 history_lines.append(f"{role}: {content}")
         history_text = "\n".join(history_lines)
 
-    stage = _detect_stage(conversation_history, ranked_docs)
+    stage = _detect_stage(conversation_history, ranked_docs, card_shown)
     stage_line = _STAGE_GUIDANCE[stage]
 
     from datetime import date
@@ -347,13 +362,14 @@ def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_hi
 async def generate_response(
     query: str,
     ranked_docs: List[Dict[str, Any]],
-    conversation_history: List[Dict[str, str]] = []
+    conversation_history: List[Dict[str, str]] = [],
+    card_shown: bool = False
 ) -> str:
     """
     Generates a grounded, context-aware response using Groq with Gemini fallback.
     """
     start_time = time.time()
-    prompt = _build_prompt(query, ranked_docs, conversation_history)
+    prompt = _build_prompt(query, ranked_docs, conversation_history, card_shown)
 
     # --- Call LLM with Resilience ---
     try:
@@ -405,12 +421,13 @@ async def generate_response(
 async def generate_response_stream(
     query: str,
     ranked_docs: List[Dict[str, Any]],
-    conversation_history: List[Dict[str, str]] = []
+    conversation_history: List[Dict[str, str]] = [],
+    card_shown: bool = False
 ):
     """
     Streaming version of generate_response with automatic fallback from Groq to Gemini.
     """
-    prompt = _build_prompt(query, ranked_docs, conversation_history)
+    prompt = _build_prompt(query, ranked_docs, conversation_history, card_shown)
 
     # --- Stream from LLM with Resilience ---
     try:

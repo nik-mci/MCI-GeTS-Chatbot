@@ -41,7 +41,9 @@
       "Bash(curl -s -X POST http://localhost:8001/chat -H 'Content-Type: application/json' -d '{\"query\": \"How much does a 7-night Bhutan trip cost for 2 people?\", \"conversation_history\": []}' --max-time 40)",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Answer:', d['answer'][:400]\\); print\\('Confidence:', d['confidence']\\); print\\('Sources:', len\\(d['sources']\\)\\)\")",
       "Bash(curl -s -X POST http://localhost:8001/chat -H 'Content-Type: application/json' -d '{\"query\": \"What about the Golden Triangle tour?\", \"conversation_history\": [{\"role\": \"user\", \"content\": \"We are a family of 4 looking for a 10-day India trip\"}, {\"role\": \"assistant\", \"content\": \"Great! For a family of 4, I recommend the Golden Triangle with Rajasthan.\"}]}' --max-time 40)",
-      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Answer:', d['answer'][:400]\\); print\\('Destination detected:', d['metadata']['destination']\\); print\\('Confidence:', d['confidence']\\)\")"
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Answer:', d['answer'][:400]\\); print\\('Destination detected:', d['metadata']['destination']\\); print\\('Confidence:', d['confidence']\\)\")",
+      "Bash(echo \"PID: $!\")",
+      "Bash(curl -s --max-time 5 http://localhost:8000/health)"
     ]
   }
 }

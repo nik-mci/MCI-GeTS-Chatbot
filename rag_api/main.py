@@ -20,7 +20,7 @@ from config import settings
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from models.schemas import ChatRequest, ChatResponse, SourceDocument, LeadCapture
+from models.schemas import ChatRequest, ChatResponse, SourceDocument, LeadCapture, AccumulatedIntentPayload
 from services.intent import extract_intent_and_entities
 from services.retrieval import retrieve_context
 from services.ranking import rank_results
@@ -113,6 +113,26 @@ async def add_cors_headers(request, call_next):
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
+def _merge_accumulated_intent(intent_info, accumulated: AccumulatedIntentPayload):
+    """Merge frontend-accumulated intent into freshly extracted intent.
+    Accumulated values fill gaps — they never overwrite what the LLM just extracted."""
+    if not accumulated:
+        return intent_info
+    if not intent_info.destination and accumulated.destinations:
+        intent_info.destination = accumulated.destinations
+    elif accumulated.destinations:
+        merged = list(set(intent_info.destination + accumulated.destinations))
+        intent_info.destination = merged
+    if not intent_info.duration and accumulated.duration:
+        intent_info.duration = accumulated.duration
+    if not intent_info.budget and accumulated.budget:
+        intent_info.budget = accumulated.budget
+    if not intent_info.travel_date and accumulated.travel_date:
+        intent_info.travel_date = accumulated.travel_date
+    if not intent_info.theme and accumulated.theme:
+        intent_info.theme = accumulated.theme
+    return intent_info
+
 LOG_FILE = "rag_log.jsonl"
 
 def log_observability(query: str, intent: dict, docs: list, answer: str):
@@ -157,7 +177,15 @@ async def capture_lead(request: LeadCapture):
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     """
-    Execute Hybrid RAG execution loop combining retrieval parameters and explicit confidence tracking.
+    Non-streaming chat endpoint. Kept for fallback/future use.
+
+    NOTE: The frontend exclusively uses /chat/stream. This endpoint does NOT emit
+    [INTENT] SSE metadata, so accumulated_intent on the frontend is not updated
+    when this path is used. If you switch the frontend to this endpoint, you must
+    either add a metadata response handler on the frontend or accept that
+    accumulated intent will not be maintained across turns.
+
+    Any new features added to /chat/stream must be manually mirrored here.
     """
     try:
         start_time = datetime.utcnow()
@@ -170,7 +198,8 @@ async def chat_endpoint(request: ChatRequest):
         # ----------------------------------------------------------------
         conversation_history = getattr(request, "conversation_history", []) or []
         intent_info = await extract_intent_and_entities(request.query, history=conversation_history)
-        
+        intent_info = _merge_accumulated_intent(intent_info, request.accumulated_intent)
+
         logger.info(f"[INTENT] Extracted: destination={intent_info.destination}, intent={intent_info.intent}, rewritten='{intent_info.rewritten_query}'")
 
         # ----------------------------------------------------------------
@@ -217,7 +246,8 @@ async def chat_endpoint(request: ChatRequest):
         answer = await generate_response(
             query=request.query,
             ranked_docs=ranked_docs,
-            conversation_history=conversation_history
+            conversation_history=conversation_history,
+            card_shown=request.card_shown
         )
 
         gen_duration = (datetime.utcnow() - gen_start).total_seconds()
@@ -286,7 +316,8 @@ async def chat_stream_endpoint(request: ChatRequest):
             # --- Step 1: Intent Extraction ---
             conversation_history = getattr(request, "conversation_history", []) or []
             intent_info = await extract_intent_and_entities(request.query, history=conversation_history)
-            
+            intent_info = _merge_accumulated_intent(intent_info, request.accumulated_intent)
+
             # --- Step 2: Conditional Retrieval ---
             ranked_docs = []
             if intent_info.rewritten_query.strip():
@@ -324,7 +355,8 @@ async def chat_stream_endpoint(request: ChatRequest):
             async for token in generate_response_stream(
                 query=request.query,
                 ranked_docs=ranked_docs,
-                conversation_history=conversation_history
+                conversation_history=conversation_history,
+                card_shown=request.card_shown
             ):
                 full_answer += token
                 safe_token = token.replace("\n", "\\n")

@@ -227,12 +227,16 @@ export default function ChatWidget() {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://web-production-9e89e.up.railway.app';
       console.log(`[GeTS AI] Connecting to backend at: ${apiBaseUrl}`);
 
+      const cardShown = messages.some(m => m.sender === 'bot' && m.text.includes('<<<END_ITINERARY_CARD>>>'));
+
       const response = await fetch(`${apiBaseUrl}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: text,
           conversation_history: conversationHistory,
+          card_shown: cardShown,
+          accumulated_intent: accumulatedIntent,
         }),
       });
 
@@ -301,8 +305,25 @@ export default function ChatWidget() {
       }
 
       // Detect lead capture trigger in completed response
-      const LEAD_TRIGGER = 'could we get your name';
-      if (fullText.toLowerCase().includes(LEAD_TRIGGER) && !leadCaptured) {
+      const LEAD_TRIGGERS = [
+        'could we get your name',
+        'could we have your name',
+        'may we get your name',
+        'may we have your name',
+        'would you mind sharing your name',
+        'would you like to share your name',
+        'to put together a personalised quote',
+        'to put together a personalized quote',
+        'our team would love to reach out',
+        'could we get your contact',
+        'share your contact',
+        'best number to reach you',
+        'best number or email to reach you',
+        'name and the best',
+        'reach out to you',
+      ];
+      const lowerFull = fullText.toLowerCase();
+      if (!leadCaptured && LEAD_TRIGGERS.some(t => lowerFull.includes(t))) {
         setMessages(prev =>
           prev.map(m => m.id === botMsgId ? { ...m, showLeadForm: true } : m)
         );

@@ -1,10 +1,19 @@
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 
+class AccumulatedIntentPayload(BaseModel):
+    destinations: Optional[List[str]] = []
+    duration: Optional[str] = None
+    budget: Optional[str] = None
+    travel_date: Optional[str] = None
+    theme: Optional[str] = None
+
 class ChatRequest(BaseModel):
     query: str
     user_context: Optional[Dict[str, Any]] = None
     conversation_history: Optional[List[Dict[str, str]]] = []
+    card_shown: bool = False
+    accumulated_intent: Optional[AccumulatedIntentPayload] = None
 
 class IntentExtraction(BaseModel):
     destination: Optional[List[str]] = []
