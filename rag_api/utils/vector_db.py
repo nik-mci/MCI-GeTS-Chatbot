@@ -1,9 +1,9 @@
+import hashlib
 import json
 import os
 import traceback
 import time
 from typing import List, Dict, Any
-import uuid
 import vecs
 import google.generativeai as genai
 import numpy as np
@@ -157,7 +157,7 @@ class SupabaseDB(VectorDBBase):
                     else:
                         clean_meta[k] = json.dumps(v)
                         
-                vector_id = str(uuid.uuid4())
+                vector_id = hashlib.sha256(text.encode("utf-8")).hexdigest()
                 clean_meta['text'] = text
                 records.append((vector_id, embeddings[i], clean_meta))
                 

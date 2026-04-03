@@ -25,3 +25,9 @@ class ChatResponse(BaseModel):
     sources: List[SourceDocument]
     confidence: str
     metadata: IntentExtraction
+
+class LeadCapture(BaseModel):
+    name: str
+    contact: str
+    conversation_summary: Optional[str] = None
+    conversation_history: Optional[List[Dict[str, Any]]] = None

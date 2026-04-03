@@ -177,8 +177,7 @@ ITINERARY CARD — DATA RULES
 - weather icons: use only "sunny", "cloudy", or "rain"
 - dailyPlan: always include at least 2 day blocks, max 7
 - faqs: always include at least 2, max 4
-- expert: use real team member data from your expert objects — if unavailable, 
-  use initials "GT", name "GeTS Team", role "India Travel Specialist", years 10
+- expert: always use initials "GT", name "GeTS Team", role "India Travel Specialist", years 15
 
 ════════════════════════════════════════
 MARKET-AWARE BEHAVIOUR
@@ -193,13 +192,18 @@ Adapt silently based on detected market (do not announce this):
 ════════════════════════════════════════
 PRICING LANGUAGE
 ════════════════════════════════════════
-Never estimate a precise number. Always use bands:
-"Trips like this typically range from ₹8,000–₹14,000 per couple per day, 
-including hotel, intercity travel, local transport, and guiding. 
-Final cost mainly depends on hotel level and travel season."
+ONLY quote a price if it appears explicitly in the CONTEXT FROM KNOWLEDGE BASE.
+If pricing context is present, you may reference it as a starting point and note
+that final cost depends on group size, hotel tier, and travel dates.
 
-After one more exchange:
-"Would you like me to narrow that to a more exact range for your travel month?"
+If NO pricing data is in the retrieved context, do NOT invent or estimate any number.
+Instead, use this pivot to lead capture:
+"Pricing depends on your group size, hotel level, and travel dates — our team
+puts together personalised quotes quickly. Could we get your name and the best
+number to reach you? We'll have a breakdown sent across within a few hours."
+
+Never say "trips like this typically range from X to Y" unless X and Y come
+directly from the retrieved context.
 
 ════════════════════════════════════════
 RESPONSE FORMAT
@@ -244,6 +248,52 @@ If the user ends the conversation, respond warmly in one sentence — no questio
 Always include a contact nudge: 
 "If you'd like to pick this up anytime, our team is just a call or email away — +91 99109 03434 or info@getsholidays.com. 🌿"
 """
+
+_STAGE_GUIDANCE = {
+    "discovery": (
+        "CURRENT STAGE: DISCOVERY — The user is still exploring. "
+        "Focus on understanding their destination interest or travel mood. "
+        "Ask one light question. Do NOT ask for contact details yet."
+    ),
+    "value": (
+        "CURRENT STAGE: VALUE — Destination is known. "
+        "Deliver itinerary content, micro-expertise cues, or a pricing band. "
+        "Trigger the itinerary card if destination and rough duration are known. "
+        "Do NOT ask for contact details yet."
+    ),
+    "conversion": (
+        "CURRENT STAGE: CONVERSION — Real value has been delivered and the user is engaged. "
+        "This is the right moment to use the exact lead capture script from your instructions "
+        "and ask for name and contact details."
+    ),
+    "handoff": (
+        "CURRENT STAGE: HANDOFF — Contact details have already been requested this session. "
+        "Continue the conversation warmly and helpfully. "
+        "Do NOT ask for contact details again."
+    ),
+}
+
+def _detect_stage(conversation_history: List[Dict[str, str]], ranked_docs: List[Dict[str, Any]]) -> str:
+    """Rule-based stage detection from conversation history."""
+    bot_messages = [m.get("content", "") for m in conversation_history if m.get("role") == "assistant"]
+    msg_count = len(conversation_history)
+
+    # HANDOFF: contact already requested
+    if any("could we get your name" in m.lower() for m in bot_messages):
+        return "handoff"
+
+    # CONVERSION: itinerary card was shown and conversation is substantive
+    card_shown = any("ITINERARY_CARD" in m for m in bot_messages)
+    if card_shown and msg_count >= 4:
+        return "conversion"
+
+    # VALUE: retrieval found relevant docs OR destination was mentioned AND conversation is underway
+    if ranked_docs and msg_count >= 2:
+        return "value"
+    if msg_count >= 4:
+        return "value"
+
+    return "discovery"
 
 def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_history: List[Dict[str, str]]) -> str:
     # --- Build context ---
@@ -290,7 +340,10 @@ def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_hi
                 history_lines.append(f"{role}: {content}")
         history_text = "\n".join(history_lines)
 
-    return f"CONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\nCURRENT USER MESSAGE:\n{query}"
+    stage = _detect_stage(conversation_history, ranked_docs)
+    stage_line = _STAGE_GUIDANCE[stage]
+
+    return f"CONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\n{stage_line}\n\nCURRENT USER MESSAGE:\n{query}"
 
 async def generate_response(
     query: str,
@@ -332,9 +385,7 @@ async def generate_response(
                 model_name=settings.GEMINI_MODEL,
                 system_instruction=SYSTEM_PROMPT
             )
-            
-            prompt = f"CONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\nCURRENT USER MESSAGE:\n{query}"
-            
+
             response = await model.generate_content_async(
                 prompt,
                 generation_config=genai.types.GenerationConfig(

@@ -20,7 +20,7 @@ from config import settings
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from models.schemas import ChatRequest, ChatResponse, SourceDocument
+from models.schemas import ChatRequest, ChatResponse, SourceDocument, LeadCapture
 from services.intent import extract_intent_and_entities
 from services.retrieval import retrieve_context
 from services.ranking import rank_results
@@ -53,7 +53,7 @@ async def startup_event():
         logger.info(f"✅ [DATABASE] Supabase Connected! Current Vectors: {count}")
         
         # Validate Dimension Consistency
-        configured_dim = 384 if settings.EMBEDDING_PROVIDER == "fastembed" else 3072
+        configured_dim = 384 if settings.EMBEDDING_PROVIDER in ("fastembed", "sentence-transformers") else 3072
         logger.info(f"✅ [DATABASE] Configured Embedding Dimension: {configured_dim} ({settings.EMBEDDING_PROVIDER})")
         
     except Exception as e:
@@ -88,20 +88,29 @@ async def health_check():
         "ai_providers": ai_status
     }
 
-# Manual CORS handling - Ultra Permissive for Production Hardening
+ALLOWED_ORIGINS = [
+    "https://mci-ge-ts-chatbot.vercel.app",
+    "http://localhost:3000",  # local development
+]
+
 @app.middleware("http")
 async def add_cors_headers(request, call_next):
+    origin = request.headers.get("origin", "")
+    allow_origin = origin if origin in ALLOWED_ORIGINS else ALLOWED_ORIGINS[0]
+
     if request.method == "OPTIONS":
         response = Response(status_code=200)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Origin"] = allow_origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
-    
+
     response = await call_next(request)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Origin"] = allow_origin
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
 LOG_FILE = "rag_log.jsonl"
@@ -125,6 +134,25 @@ def log_observability(query: str, intent: dict, docs: list, answer: str):
             f.write(json.dumps(log_entry) + "\n")
     except Exception as e:
         logger.error(f"Failed to write observability log: {e}")
+
+@app.post("/lead")
+async def capture_lead(request: LeadCapture):
+    try:
+        import psycopg2
+        conn = psycopg2.connect(settings.SUPABASE_CONNECTION_STRING)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO leads (name, contact, conversation_summary, conversation_history) VALUES (%s, %s, %s, %s)",
+                (request.name, request.contact, request.conversation_summary, json.dumps(request.conversation_history) if request.conversation_history else None)
+            )
+        conn.commit()
+        conn.close()
+        logger.info(f"[LEAD] Captured: {request.name} / {request.contact}")
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"[LEAD] Failed to save lead: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save lead")
+
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
@@ -306,6 +334,12 @@ async def chat_stream_endpoint(request: ChatRequest):
             total_duration = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"✅ [STREAM] Completed in {total_duration:.2f}s | Words: {len(full_answer.split())}")
             log_observability(request.query, intent_info.dict(), ranked_docs, full_answer)
+
+            # Emit structured intent metadata so the frontend can accumulate a handoff summary
+            try:
+                yield f"data: [INTENT]{intent_info.model_dump_json()}\n\n"
+            except Exception:
+                pass  # Never block the stream for metadata
 
         except Exception as e:
             logger.error(f"🔥 [STREAM-ERROR] Failed for query \"{request.query}\": {str(e)}")

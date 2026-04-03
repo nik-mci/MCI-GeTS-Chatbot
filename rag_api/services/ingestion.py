@@ -55,6 +55,62 @@ def is_low_quality(item: dict) -> bool:
         
     return False
 
+_BOILERPLATE_SECTION_TRIGGERS = [
+    "your tour cost does not include",
+    "tour cost does not include",
+    "does not include",
+    "important information",
+    "other important information",
+    "vaccinations",
+    "temple etiquette",
+    "currency and payments",
+    "hygiene practices",
+    "emergency contacts",
+    "medications and health kit",
+    "passports and visas",
+    "visas for india",
+    "multiple entry visa",
+    "e-visa",
+    "indianvisaonline",
+]
+
+_BOILERPLATE_LINE_PATTERNS = [
+    "usual norm per day",
+    "usd 10 for the driver",
+    "usd 15 for the guide",
+    "usd 8 for the guide",
+    "for domestic flights, you are entitled",
+    "supplement is approx",
+    "hand baggage",
+    "gets holidays has offices",
+    "dedicated travel expert can be reached",
+    "24-hour assistance",
+    "sincerest apologies",
+]
+
+def _is_boilerplate_line(line: str) -> bool:
+    lower = line.lower()
+    return any(pattern in lower for pattern in _BOILERPLATE_LINE_PATTERNS)
+
+def _strip_boilerplate_sections(lines: list) -> list:
+    """
+    Removes boilerplate sections from docx paragraphs.
+    Once a section trigger is hit, all subsequent lines are dropped.
+    Individual boilerplate lines are also filtered regardless of position.
+    """
+    cleaned = []
+    section_cut = False
+    for line in lines:
+        lower = line.lower()
+        if any(trigger in lower for trigger in _BOILERPLATE_SECTION_TRIGGERS):
+            section_cut = True
+        if section_cut:
+            continue
+        if _is_boilerplate_line(line):
+            continue
+        cleaned.append(line)
+    return cleaned
+
 def chunk_text_by_words(text: str, max_words: int = 150, overlap: int = 30) -> list:
     words = text.split()
     chunks = []
@@ -142,12 +198,9 @@ def ingest_itineraries_docs():
         file_path = os.path.join(docs_path, filename)
         try:
             doc = Document(file_path)
-            full_text = []
-            for para in doc.paragraphs:
-                if para.text.strip():
-                    full_text.append(para.text.strip())
-            
-            content = "\n".join(full_text)
+            raw_lines = [para.text.strip() for para in doc.paragraphs if para.text.strip()]
+            clean_lines = _strip_boilerplate_sections(raw_lines)
+            content = "\n".join(clean_lines)
             title = filename.replace("- Rewritten Itinerary", "").replace("- Rewritten itinerary", "").replace(".docx", "").strip()
             
             # Extract destination from filename or content

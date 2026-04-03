@@ -1,15 +1,60 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, Globe, AlertCircle, Phone, PhoneCall, Mail } from 'lucide-react';
+import { MessageCircle, X, Send, Globe, AlertCircle, Phone, PhoneCall, Mail, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ItineraryCard, { ItineraryCardData } from './ItineraryCard';
+import LeadForm from './LeadForm';
 
 interface Message {
   id: string;
   text: string;
   sender: 'bot' | 'user';
   timestamp: Date;
+  showLeadForm?: boolean;
+}
+
+const SESSION_MESSAGES_KEY = 'gets_messages';
+const SESSION_TIMESTAMP_KEY = 'gets_session_timestamp';
+const SESSION_LEAD_KEY = 'gets_lead_captured';
+const SESSION_INTENT_KEY = 'gets_intent';
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface AccumulatedIntent {
+  destinations: string[];
+  duration: string | null;
+  budget: string | null;
+  travel_date: string | null;
+  theme: string | null;
+}
+
+function mergeIntent(prev: AccumulatedIntent, incoming: Record<string, unknown>): AccumulatedIntent {
+  const newDests = Array.isArray(incoming.destination) ? incoming.destination as string[] : [];
+  return {
+    destinations: Array.from(new Set([...prev.destinations, ...newDests])),
+    duration: (incoming.duration as string | null) || prev.duration,
+    budget: (incoming.budget as string | null) || prev.budget,
+    travel_date: (incoming.travel_date as string | null) || prev.travel_date,
+    theme: (incoming.theme as string | null) || prev.theme,
+  };
+}
+
+function formatHandoffSummary(intent: AccumulatedIntent): string {
+  const line = '\u2500'.repeat(28);
+  const rows: string[] = ['TRIP INTEREST SUMMARY', line];
+  if (intent.destinations.length > 0)
+    rows.push(`Destination : ${intent.destinations.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')}`);
+  if (intent.duration)   rows.push(`Duration    : ${intent.duration}`);
+  if (intent.budget)     rows.push(`Budget      : ${intent.budget}`);
+  if (intent.travel_date) rows.push(`Travel date : ${intent.travel_date}`);
+  if (intent.theme)      rows.push(`Theme/Type  : ${intent.theme}`);
+  if (rows.length === 2) rows.push('No specific trip details captured.');
+  rows.push(line);
+  return rows.join('\n');
+}
+
+function generateSessionId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 const QUICK_REPLIES = [
@@ -19,6 +64,17 @@ const QUICK_REPLIES = [
   "For a solo trip 🧳",
   "Group Tour 🚢",
 ];
+
+// TODO: Replace with confirmed GeTS WhatsApp number when available
+const WHATSAPP_NUMBER = '919910903434';
+
+function WhatsAppIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+  );
+}
 
 function BotAvatar() {
   return (
@@ -42,6 +98,11 @@ export default function ChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notificationCount, setNotificationCount] = useState(1);
+  const [leadCaptured, setLeadCaptured] = useState(false);
+  const [sessionId, setSessionId] = useState<string>('');
+  const [accumulatedIntent, setAccumulatedIntent] = useState<AccumulatedIntent>({
+    destinations: [], duration: null, budget: null, travel_date: null, theme: null,
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Only attempt to parse the card once the full delimiters have arrived
@@ -60,20 +121,51 @@ export default function ChatWidget() {
     }
   }
 
-  // Initial welcome message
+  // Restore session from localStorage on mount, or start fresh
   useEffect(() => {
-    if (messages.length === 0) {
-      setTimeout(() => {
-        const welcome: Message = {
-          id: 'welcome',
-          text: "Hi Friend, I'm GeTS bot!\nTraveling soon? I can help you dig thru some ideas.",
-          sender: 'bot',
-          timestamp: new Date(),
-        };
-        setMessages([welcome]);
-      }, 1000);
+    const savedMessages = localStorage.getItem(SESSION_MESSAGES_KEY);
+    const savedTimestamp = localStorage.getItem(SESSION_TIMESTAMP_KEY);
+    const savedLeadCaptured = localStorage.getItem(SESSION_LEAD_KEY);
+
+    if (savedMessages && savedTimestamp) {
+      const age = Date.now() - parseInt(savedTimestamp);
+      if (age < SESSION_TTL_MS) {
+        const parsed = JSON.parse(savedMessages) as Message[];
+        const restored = parsed.map(m => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+          showLeadForm: false, // never restore ephemeral form state
+        }));
+        setMessages(restored);
+        setLeadCaptured(savedLeadCaptured === 'true');
+        setSessionId(generateSessionId());
+        const savedIntent = localStorage.getItem(SESSION_INTENT_KEY);
+        if (savedIntent) setAccumulatedIntent(JSON.parse(savedIntent));
+        return;
+      }
     }
-  }, [messages.length]);
+
+    // No valid session — show welcome message
+    const newId = generateSessionId();
+    setSessionId(newId);
+    setTimeout(() => {
+      setMessages([{
+        id: 'welcome',
+        text: "Welcome to GeTS Holidays 🌿\nPlanning a trip to India, Bhutan, Nepal or Sri Lanka? Tell us what you have in mind and we'll help shape it.",
+        sender: 'bot',
+        timestamp: new Date(),
+      }]);
+    }, 1000);
+  }, []);
+
+  // Persist messages, lead state, and accumulated intent to localStorage after every change
+  useEffect(() => {
+    if (messages.length === 0) return;
+    localStorage.setItem(SESSION_MESSAGES_KEY, JSON.stringify(messages));
+    localStorage.setItem(SESSION_TIMESTAMP_KEY, Date.now().toString());
+    localStorage.setItem(SESSION_LEAD_KEY, String(leadCaptured));
+    localStorage.setItem(SESSION_INTENT_KEY, JSON.stringify(accumulatedIntent));
+  }, [messages, leadCaptured, accumulatedIntent]);
 
   useEffect(() => {
     scrollToBottom();
@@ -160,6 +252,13 @@ export default function ChatWidget() {
             setIsLoading(false);
             return;
           }
+          if (token.startsWith('[INTENT]')) {
+            try {
+              const intent = JSON.parse(token.slice(8));
+              setAccumulatedIntent(prev => mergeIntent(prev, intent));
+            } catch { /* malformed intent — skip silently */ }
+            continue;
+          }
 
           // Restore newlines that were escaped for SSE transport
           const decodedToken = token.replace(/\\n/g, '\n');
@@ -191,11 +290,95 @@ export default function ChatWidget() {
         }
       }
 
+      // Detect lead capture trigger in completed response
+      const LEAD_TRIGGER = 'could we get your name';
+      if (fullText.toLowerCase().includes(LEAD_TRIGGER) && !leadCaptured) {
+        setMessages(prev =>
+          prev.map(m => m.id === botMsgId ? { ...m, showLeadForm: true } : m)
+        );
+      }
+
     } catch (err) {
       setError("Sorry, I'm having trouble connecting. Please try again.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const clearSession = () => {
+    localStorage.removeItem(SESSION_MESSAGES_KEY);
+    localStorage.removeItem(SESSION_TIMESTAMP_KEY);
+    localStorage.removeItem(SESSION_LEAD_KEY);
+    localStorage.removeItem(SESSION_INTENT_KEY);
+    setAccumulatedIntent({ destinations: [], duration: null, budget: null, travel_date: null, theme: null });
+    setMessages([]);
+    setLeadCaptured(false);
+    setError(null);
+    setSessionId(generateSessionId());
+    setTimeout(() => {
+      setMessages([{
+        id: 'welcome',
+        text: "Welcome to GeTS Holidays 🌿\nPlanning a trip to India, Bhutan, Nepal or Sri Lanka? Tell us what you have in mind and we'll help shape it.",
+        sender: 'bot',
+        timestamp: new Date(),
+      }]);
+    }, 400);
+  };
+
+  const handleLeadSubmit = async (name: string, contact: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://web-production-9e89e.up.railway.app';
+    const recentChat = messages
+      .slice(-8)
+      .map(m => `${m.sender === 'user' ? 'User' : 'Bot'}: ${m.text.slice(0, 300)}`)
+      .join('\n');
+    const summary = formatHandoffSummary(accumulatedIntent) + '\n\nRECENT CONVERSATION\n' + recentChat;
+
+    const history = messages
+      .filter(m => m.id !== 'welcome' && m.text.trim().length > 0)
+      .filter(m => {
+        if (m.sender === 'user') return true; // always keep user messages
+        const clean = m.text.replace(/<<<ITINERARY_CARD>>>[\s\S]*?<<<END_ITINERARY_CARD>>>/g, '').trim();
+        return clean.length > 100; // only keep substantive bot messages
+      })
+      .map(({ sender, text, timestamp }) => {
+        // Replace itinerary card JSON with a short note
+        const cardMatch = text.match(/<<<ITINERARY_CARD>>>([\s\S]*?)<<<END_ITINERARY_CARD>>>/);
+        let cleanText = text.replace(/<<<ITINERARY_CARD>>>[\s\S]*?<<<END_ITINERARY_CARD>>>/, '').trim();
+        if (cardMatch) {
+          try {
+            const card = JSON.parse(cardMatch[1].trim());
+            cleanText = `[Showed itinerary card: ${card.destination}]\n` + cleanText;
+          } catch {
+            cleanText = '[Showed itinerary card]\n' + cleanText;
+          }
+        }
+        return {
+          role: sender === 'user' ? 'user' : 'assistant',
+          text: cleanText,
+          timestamp: timestamp.toISOString(),
+        };
+      });
+
+    try {
+      await fetch(`${apiBaseUrl}/lead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, contact, conversation_summary: summary, conversation_history: history }),
+      });
+    } catch {
+      // submission error is shown in LeadForm — don't block the confirmation
+    }
+
+    setLeadCaptured(true);
+    setMessages(prev => [
+      ...prev.map(m => ({ ...m, showLeadForm: false })),
+      {
+        id: Date.now().toString(),
+        text: `Thanks ${name}! Our team will reach out to you at ${contact} shortly. Feel free to keep exploring ideas in the meantime. 🌿`,
+        sender: 'bot' as const,
+        timestamp: new Date(),
+      },
+    ]);
   };
 
   return (
@@ -213,13 +396,23 @@ export default function ChatWidget() {
             {/* Header */}
             <div className="bg-[#CC0000] px-4 py-3 flex items-center justify-between flex-shrink-0">
               <h3 className="font-semibold text-[14px] text-white tracking-wide">GeTS AI Assistant</h3>
-              <button
-                onClick={toggleChat}
-                className="hover:bg-white/20 p-1 rounded transition-colors text-white"
-                aria-label="Close Chat"
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={clearSession}
+                  className="hover:bg-white/20 p-1 rounded transition-colors text-white/70 hover:text-white"
+                  aria-label="Start new conversation"
+                  title="Start fresh"
+                >
+                  <Trash2 size={15} />
+                </button>
+                <button
+                  onClick={toggleChat}
+                  className="hover:bg-white/20 p-1 rounded transition-colors text-white"
+                  aria-label="Close Chat"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Messages Area */}
@@ -231,16 +424,19 @@ export default function ChatWidget() {
                     <div key={msg.id} className="flex items-start gap-2.5">
                       <BotAvatar />
                       <div className="flex flex-col items-start" style={{ maxWidth: 'calc(100% - 44px)' }}>
-                        {cardData && <ItineraryCard data={cardData} />}
                         {cleanText.length > 0 && (
                           <div
                             className="bg-white px-3 py-2.5 text-[13px] leading-relaxed text-slate-800 shadow-sm border border-slate-100"
-                            style={{ borderRadius: '0 8px 8px 8px', marginTop: cardData ? 6 : 0 }}
+                            style={{ borderRadius: '0 8px 8px 8px', marginBottom: cardData ? 6 : 0 }}
                           >
                             {cleanText.split('\n').map((line, i, arr) => (
                               <span key={i}>{line}{i < arr.length - 1 && <br />}</span>
                             ))}
                           </div>
+                        )}
+                        {cardData && <ItineraryCard data={cardData} />}
+                        {msg.showLeadForm && !leadCaptured && (
+                          <LeadForm onSubmit={handleLeadSubmit} />
                         )}
                         <span className="text-[10px] text-slate-400 mt-1 ml-0.5">
                           {formatTimestamp(msg.timestamp)}
@@ -331,6 +527,17 @@ export default function ChatWidget() {
                   >
                     <PhoneCall size={13} className="text-[#CC0000] group-hover:text-white transition-colors" />
                     <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Landline</span>
+                  </a>
+                  <a
+                    href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-[#25D366] hover:bg-[#25D366] transition-all group"
+                  >
+                    <span className="text-[#25D366] group-hover:text-white transition-colors">
+                      <WhatsAppIcon size={13} />
+                    </span>
+                    <span className="text-[10px] font-semibold text-[#25D366] group-hover:text-white transition-colors">WhatsApp</span>
                   </a>
                   <a
                     href="mailto:info@getsholidays.com"
