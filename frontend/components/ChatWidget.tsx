@@ -78,30 +78,30 @@ function getContextualReplies(
   const lower = lastBotMessage.toLowerCase();
 
   if (/month|season|when|time of year|monsoon|weather|best time/.test(lower)) {
-    return ['Oct–Nov (cool & dry)', 'Dec–Feb (winter sun)', 'Mar–Apr (spring)', 'Jul–Aug (monsoon)'];
+    return ['Oct–Mar (cool & dry)', 'Apr–Jun (fewer crowds)', 'Jul–Sep (monsoon)'];
   }
   if (/how many days|how long|duration|nights|week|days do/.test(lower)) {
-    return ['5–7 days', '8–10 days', '10–14 days', 'More than 2 weeks'];
+    return ['7–8 days', '10–12 days', '2 weeks or more'];
   }
   if (/hotel|stay|accommodation|tier|luxury|budget|standard/.test(lower)) {
-    return ['Budget (3★)', 'Standard (4★)', 'Luxury (5★)', 'Mix of tiers'];
+    return ['Standard (4★)', 'Luxury (5★)', 'Mix of tiers'];
   }
   if (!accumulatedIntent.group_size && /who|group|travel with|party|travell|couple|family|solo|friends/.test(lower)) {
-    return ['Just the two of us 💑', 'Family with kids 👨‍👩‍👧', 'Friends group 👥', 'Solo 🧳'];
+    return ['Just the two of us', 'Family with kids', 'Solo traveller'];
   }
 
   // Stage-based fallbacks
   if (stage === 'discovery' && accumulatedIntent.destinations.length === 0) {
-    return ['Kerala 🌴', 'Rajasthan 🏰', 'Bhutan 🏔️', 'Golden Triangle'];
+    return ['Kerala 🌴', 'Rajasthan 🏰', 'Bhutan 🏔️'];
   }
   if (stage === 'discovery') {
-    return ['Show me an itinerary', 'What are the highlights?', 'Best time to visit', 'What does it cost?'];
+    return ['Show me an itinerary', 'Best time to visit', 'What does it cost?'];
   }
   if (stage === 'value') {
-    return ['Show me an itinerary', 'What does it cost?', 'How long should we go for?', 'Best time to visit'];
+    return ['Show me an itinerary', 'What does it cost?', 'Best time to visit'];
   }
   if (stage === 'conversion') {
-    return ['Get a personalised quote', 'Customise this for us', 'Call us now', 'Tell me more first'];
+    return ['Get a personalised quote', 'Customise for our group', 'Tell me more first'];
   }
 
   return []; // handoff stage — no quick replies
@@ -504,11 +504,11 @@ export default function ChatWidget() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-[80px] sm:bottom-[88px] right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-[360px] h-[calc(100dvh-120px)] sm:h-[560px] max-h-[700px] bg-white shadow-2xl flex flex-col z-[100] border border-slate-200 rounded-lg overflow-hidden"
+            className="fixed bottom-[80px] sm:bottom-[88px] right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-[460px] h-[calc(100dvh-100px)] sm:h-[680px] max-h-[860px] bg-white shadow-2xl flex flex-col z-[100] border border-slate-200 rounded-lg overflow-hidden"
           >
             {/* Header */}
-            <div className="bg-[#CC0000] px-4 py-3 flex items-center justify-between flex-shrink-0">
-              <h3 className="font-semibold text-[14px] text-white tracking-wide">GeTS AI Assistant</h3>
+            <div className="bg-[#CC0000] px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+              <h3 className="font-semibold text-[15px] text-white tracking-wide">GeTS AI Assistant</h3>
               <div className="flex items-center gap-1">
                 <button
                   onClick={clearSession}
@@ -529,7 +529,7 @@ export default function ChatWidget() {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-[#f7f7f7] chat-scrollbar">
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-[#f7f7f7] chat-scrollbar">
               {(() => {
                 const lastBotMsg = [...messages].reverse().find(m => m.sender === 'bot');
                 const lastBotId = lastBotMsg?.id;
@@ -549,8 +549,8 @@ export default function ChatWidget() {
                       <div className="flex flex-col items-start" style={{ maxWidth: 'calc(100% - 44px)' }}>
                         {cleanText.length > 0 && (
                           <div
-                            className="bg-white px-3 py-2.5 text-[13px] leading-relaxed text-slate-800 shadow-sm border border-slate-100"
-                            style={{ borderRadius: '0 8px 8px 8px', marginBottom: (cardData || cardLoading) ? 6 : 0 }}
+                            className="bg-white px-4 py-3 text-[14px] leading-relaxed text-slate-800 shadow-sm border border-slate-100"
+                            style={{ borderRadius: '0 8px 8px 8px', marginBottom: (cardData || cardLoading) ? 8 : 0 }}
                           >
                             {cleanText.split('\n').map((line, i, arr) => (
                               <span key={i}>{line}{i < arr.length - 1 && <br />}</span>
@@ -574,20 +574,20 @@ export default function ChatWidget() {
                         )}
                         {/* Contextual quick replies — shown only below the last bot message */}
                         {msg.id === lastBotId && contextualReplies.length > 0 && (
-                          <div className="flex flex-col gap-1.5 mt-2 w-full">
+                          <div className="flex flex-col gap-2 mt-3 w-full">
                             {contextualReplies.map((reply) => (
                               <button
                                 key={reply}
                                 onClick={() => handleSend(reply)}
-                                className="w-full py-2 px-3 border border-[#CC0000] text-[#CC0000] text-[12px] hover:bg-[#CC0000] hover:text-white transition-all bg-white text-left"
-                                style={{ borderRadius: 4 }}
+                                className="w-full py-3 px-4 border border-[#CC0000] text-[#CC0000] text-[13px] font-medium hover:bg-[#CC0000] hover:text-white transition-all bg-white text-left"
+                                style={{ borderRadius: 6 }}
                               >
                                 {reply}
                               </button>
                             ))}
                           </div>
                         )}
-                        <span className="text-[10px] text-slate-400 mt-1 ml-0.5">
+                        <span className="text-[11px] text-slate-400 mt-1 ml-0.5">
                           {formatTimestamp(msg.timestamp)}
                         </span>
                       </div>
@@ -598,12 +598,12 @@ export default function ChatWidget() {
                   <div key={msg.id} className="flex justify-end">
                     <div className="flex flex-col items-end" style={{ maxWidth: '80%' }}>
                       <div
-                        className="bg-[#CC0000] text-white px-3 py-2.5 text-[13px] leading-relaxed shadow-sm"
+                        className="bg-[#CC0000] text-white px-4 py-3 text-[14px] leading-relaxed shadow-sm"
                         style={{ borderRadius: '8px 0 8px 8px' }}
                       >
                         {msg.text}
                       </div>
-                      <span className="text-[10px] text-slate-400 mt-1">
+                      <span className="text-[11px] text-slate-400 mt-1">
                         {formatTimestamp(msg.timestamp)}
                       </span>
                     </div>
@@ -638,15 +638,15 @@ export default function ChatWidget() {
               {/* Welcome quick replies — shown only on the very first message, uses a fixed set */}
               {messages.length === 1 && !isLoading && (
                 <div className="flex flex-col gap-2 mt-1 ml-10">
-                  <p className="text-[11px] text-slate-500 italic mb-0.5">
+                  <p className="text-[12px] text-slate-500 italic mb-0.5">
                     What type of trip are you planning?
                   </p>
                   {INITIAL_QUICK_REPLIES.map((reply) => (
                     <button
                       key={reply}
                       onClick={() => handleSend(reply)}
-                      className="w-full py-2.5 px-4 border border-[#CC0000] text-[#CC0000] text-[13px] hover:bg-[#CC0000] hover:text-white transition-all bg-white text-left"
-                      style={{ borderRadius: 4 }}
+                      className="w-full py-3 px-4 border border-[#CC0000] text-[#CC0000] text-[14px] font-medium hover:bg-[#CC0000] hover:text-white transition-all bg-white text-left"
+                      style={{ borderRadius: 6 }}
                     >
                       {reply}
                     </button>
@@ -661,44 +661,44 @@ export default function ChatWidget() {
                 we have at least a destination or group size (user is meaningfully engaged) */}
             {['value', 'conversion', 'handoff'].includes(currentStage) &&
              (accumulatedIntent.destinations.length > 0 || !!accumulatedIntent.group_size) && (
-              <div className="px-3 pt-2.5 pb-2 bg-white border-t border-slate-100 flex-shrink-0">
-                <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-widest text-center mb-2">
+              <div className="px-3 pt-2 pb-2 bg-white border-t border-slate-100 flex-shrink-0">
+                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest text-center mb-2">
                   Talk to our travel experts
                 </p>
                 <div className="flex gap-2">
                   <a
                     href="tel:+919910903434"
-                    className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-[#CC0000] hover:bg-[#CC0000] transition-all group"
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded border border-[#CC0000] hover:bg-[#CC0000] transition-all group"
                     title="+91 99109 03434"
                   >
-                    <Phone size={13} className="text-[#CC0000] group-hover:text-white transition-colors" />
-                    <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Call 1</span>
+                    <Phone size={15} className="text-[#CC0000] group-hover:text-white transition-colors" />
+                    <span className="text-[11px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Call 1</span>
                   </a>
                   <a
                     href="tel:+919910903535"
-                    className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-[#CC0000] hover:bg-[#CC0000] transition-all group"
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded border border-[#CC0000] hover:bg-[#CC0000] transition-all group"
                     title="+91 99109 03535"
                   >
-                    <Phone size={13} className="text-[#CC0000] group-hover:text-white transition-colors" />
-                    <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Call 2</span>
+                    <Phone size={15} className="text-[#CC0000] group-hover:text-white transition-colors" />
+                    <span className="text-[11px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Call 2</span>
                   </a>
                   <a
                     href={`https://wa.me/${WHATSAPP_NUMBER}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-[#25D366] hover:bg-[#25D366] transition-all group"
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded border border-[#25D366] hover:bg-[#25D366] transition-all group"
                   >
                     <span className="text-[#25D366] group-hover:text-white transition-colors">
-                      <WhatsAppIcon size={13} />
+                      <WhatsAppIcon size={15} />
                     </span>
-                    <span className="text-[10px] font-semibold text-[#25D366] group-hover:text-white transition-colors">WhatsApp</span>
+                    <span className="text-[11px] font-semibold text-[#25D366] group-hover:text-white transition-colors">WhatsApp</span>
                   </a>
                   <a
                     href="mailto:info@getsholidays.com"
-                    className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-slate-200 hover:border-[#CC0000] hover:bg-[#CC0000] transition-all group"
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded border border-slate-200 hover:border-[#CC0000] hover:bg-[#CC0000] transition-all group"
                   >
-                    <Mail size={13} className="text-slate-400 group-hover:text-white transition-colors" />
-                    <span className="text-[10px] font-semibold text-slate-400 group-hover:text-white transition-colors">Email</span>
+                    <Mail size={15} className="text-slate-400 group-hover:text-white transition-colors" />
+                    <span className="text-[11px] font-semibold text-slate-400 group-hover:text-white transition-colors">Email</span>
                   </a>
                 </div>
               </div>
@@ -713,17 +713,17 @@ export default function ChatWidget() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend(input)}
                   placeholder="Type a message..."
-                  className="flex-1 text-[13px] text-slate-700 placeholder:text-slate-400 outline-none border-none bg-transparent"
+                  className="flex-1 text-[15px] text-slate-700 placeholder:text-slate-400 outline-none border-none bg-transparent"
                 />
                 <button
                   onClick={() => handleSend(input)}
                   disabled={!input.trim() || isLoading}
                   className="text-slate-400 hover:text-[#CC0000] transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
                 >
-                  <Send size={17} />
+                  <Send size={19} />
                 </button>
               </div>
-              <div className="mt-2 pt-2 border-t border-slate-100">
+              <div className="mt-1.5 pt-1.5 border-t border-slate-100">
                 <p className="text-center text-[9px] text-slate-400 font-medium uppercase tracking-widest">
                   ⚡ Powered by GeTS AI
                 </p>

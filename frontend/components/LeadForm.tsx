@@ -64,7 +64,7 @@ export default function LeadForm({ onSubmit }: LeadFormProps) {
         gap: 7,
       }}
     >
-      <p style={{ margin: 0, fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+      <p style={{ margin: 0, fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>
         Share your details
       </p>
       <input
@@ -73,8 +73,8 @@ export default function LeadForm({ onSubmit }: LeadFormProps) {
         onChange={e => setName(e.target.value)}
         placeholder="Your name"
         style={{
-          fontSize: 13,
-          padding: '7px 10px',
+          fontSize: 14,
+          padding: '9px 12px',
           border: '1px solid #e2e8f0',
           borderRadius: 6,
           outline: 'none',
@@ -89,8 +89,8 @@ export default function LeadForm({ onSubmit }: LeadFormProps) {
         onKeyDown={e => e.key === 'Enter' && handleSubmit()}
         placeholder="WhatsApp / Phone / Email"
         style={{
-          fontSize: 13,
-          padding: '7px 10px',
+          fontSize: 14,
+          padding: '9px 12px',
           border: '1px solid #e2e8f0',
           borderRadius: 6,
           outline: 'none',
@@ -113,8 +113,8 @@ export default function LeadForm({ onSubmit }: LeadFormProps) {
           color: '#fff',
           border: 'none',
           borderRadius: 6,
-          padding: '8px 12px',
-          fontSize: 12.5,
+          padding: '10px 14px',
+          fontSize: 14,
           fontWeight: 600,
           cursor: !name.trim() || !contact.trim() || submitting ? 'not-allowed' : 'pointer',
           transition: 'background 0.15s',

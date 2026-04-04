@@ -107,10 +107,10 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
         overflow: 'hidden',
         border: '1px solid #e2e8f0',
         background: '#fff',
-        fontSize: 13,
+        fontSize: 14,
         position: 'relative',
         width: '100%',
-        maxWidth: 320,
+        maxWidth: 400,
       }}
     >
       {/* ── Header ── */}
@@ -121,7 +121,7 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
           padding: '12px 14px 10px',
         }}
       >
-        <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: 0.2 }}>
+        <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: 0.2 }}>
           {data.destination}
         </div>
       </div>
@@ -140,8 +140,8 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
             onClick={() => setActiveTab(tab.id)}
             style={{
               flex: 1,
-              padding: '7px 2px',
-              fontSize: 10.5,
+              padding: '8px 2px',
+              fontSize: 12,
               fontWeight: activeTab === tab.id ? 700 : 500,
               color: activeTab === tab.id ? '#1a4a3a' : '#64748b',
               background: 'none',
@@ -157,14 +157,14 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
       </div>
 
       {/* ── Tab content ── */}
-      <div style={{ padding: '12px 14px', background: '#f8fafc' }}>
+      <div style={{ padding: '14px 16px', background: '#f8fafc' }}>
 
         {/* ─── OVERVIEW ─── */}
         {activeTab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
             {/* Overview paragraph */}
-            <p style={{ margin: 0, color: '#334155', lineHeight: 1.55, fontSize: 12.5 }}>
+            <p style={{ margin: 0, color: '#334155', lineHeight: 1.6, fontSize: 14 }}>
               {data.overview}
             </p>
 
@@ -192,10 +192,10 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ color: '#1a4a3a', fontWeight: 700, fontSize: 14 }}>
+                  <div style={{ color: '#1a4a3a', fontWeight: 700, fontSize: 16 }}>
                     {stat.value}
                   </div>
-                  <div style={{ color: '#94a3b8', fontSize: 9.5, marginTop: 2 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>
                     {stat.label}
                   </div>
                 </div>
@@ -212,7 +212,7 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                   padding: '8px 10px',
                 }}
               >
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>
                   Seasonal guide
                 </div>
                 {data.weather.map((w, i) => (
@@ -222,20 +222,20 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
-                      padding: '4px 0',
+                      padding: '5px 0',
                       borderTop: i > 0 ? '1px solid #f1f5f9' : 'none',
                     }}
                   >
-                    <span style={{ fontSize: 14, flexShrink: 0 }}>{weatherIcon(w.icon)}</span>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>{weatherIcon(w.icon)}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: '#334155' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
                         {w.season}
                       </div>
                       {w.note && (
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>{w.note}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{w.note}</div>
                       )}
                     </div>
-                    <span style={{ fontSize: 10.5, color: '#64748b', flexShrink: 0 }}>
+                    <span style={{ fontSize: 12, color: '#64748b', flexShrink: 0 }}>
                       {w.low}°–{w.high}°C
                     </span>
                   </div>
@@ -252,21 +252,21 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                 padding: '8px 10px',
               }}
             >
-              <div style={{ fontSize: 10, fontWeight: 600, color: '#1a4a3a', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#1a4a3a', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
                 Pricing
               </div>
               {data.priceFrom > 0 && data.priceTo > 0 ? (
                 <>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1a4a3a' }}>
+                  <div style={{ fontWeight: 700, fontSize: 17, color: '#1a4a3a' }}>
                     {data.priceCurrency}{data.priceFrom.toLocaleString()} – {data.priceCurrency}{data.priceTo.toLocaleString()}
                   </div>
-                  <div style={{ fontSize: 10.5, color: '#2d7a56', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: '#2d7a56', marginTop: 2 }}>
                     {data.priceUnit}
                   </div>
                 </>
               ) : null}
               {data.priceNote && (
-                <div style={{ fontSize: 10, color: '#64748b', marginTop: data.priceFrom > 0 ? 5 : 0, lineHeight: 1.45 }}>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: data.priceFrom > 0 ? 5 : 0, lineHeight: 1.5 }}>
                   {data.priceNote}
                 </div>
               )}
@@ -287,8 +287,8 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
               >
                 <div
                   style={{
-                    width: 34,
-                    height: 34,
+                    width: 38,
+                    height: 38,
                     borderRadius: '50%',
                     background: '#1a4a3a',
                     color: '#fff',
@@ -296,20 +296,20 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 700,
-                    fontSize: 12,
+                    fontSize: 13,
                     flexShrink: 0,
                   }}
                 >
                   {data.expert.initials}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 12, color: '#1e293b' }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: '#1e293b' }}>
                     {data.expert.name}
                   </div>
-                  <div style={{ fontSize: 10.5, color: '#64748b' }}>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>
                     {data.expert.role} · {data.expert.years} yrs
                   </div>
-                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
                     {data.expert.destinations}
                   </div>
                 </div>
@@ -356,40 +356,40 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                     style={{
                       background: '#1a4a3a',
                       color: '#fff',
-                      padding: '6px 10px',
-                      fontSize: 11,
+                      padding: '7px 12px',
+                      fontSize: 13,
                       fontWeight: 600,
                     }}
                   >
                     {dayBlock.day}
                   </div>
-                  <div style={{ padding: '6px 10px' }}>
+                  <div style={{ padding: '8px 12px' }}>
                     {dayBlock.items.map((item, j) => (
                       <div
                         key={j}
                         style={{
                           display: 'flex',
                           gap: 8,
-                          padding: '4px 0',
+                          padding: '5px 0',
                           borderTop: j > 0 ? '1px solid #f1f5f9' : 'none',
                           alignItems: 'flex-start',
                         }}
                       >
                         <span
                           style={{
-                            fontSize: 9.5,
+                            fontSize: 11,
                             fontWeight: 700,
                             color: '#1a4a3a',
                             textTransform: 'uppercase',
                             letterSpacing: 0.3,
-                            width: 26,
+                            width: 30,
                             paddingTop: 1,
                             flexShrink: 0,
                           }}
                         >
                           {item.time}
                         </span>
-                        <span style={{ fontSize: 11.5, color: '#334155', lineHeight: 1.45 }}>
+                        <span style={{ fontSize: 13, color: '#334155', lineHeight: 1.5 }}>
                           {item.desc}
                         </span>
                       </div>
@@ -417,16 +417,16 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                   padding: '8px 10px',
                 }}
               >
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
                   Comfortable
                 </div>
                 {data.stays.comfortable.map((hotel, i) => (
                   <div
                     key={i}
                     style={{
-                      fontSize: 12,
+                      fontSize: 13,
                       color: '#1e293b',
-                      padding: '3px 0',
+                      padding: '4px 0',
                       borderTop: i > 0 ? '1px solid #f1f5f9' : 'none',
                       display: 'flex',
                       alignItems: 'center',
@@ -449,16 +449,16 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                   padding: '8px 10px',
                 }}
               >
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
                   Premium
                 </div>
                 {data.stays.premium.map((hotel, i) => (
                   <div
                     key={i}
                     style={{
-                      fontSize: 12,
+                      fontSize: 13,
                       color: '#1e293b',
-                      padding: '3px 0',
+                      padding: '4px 0',
                       borderTop: i > 0 ? '1px solid #f1f5f9' : 'none',
                       display: 'flex',
                       alignItems: 'center',
@@ -474,12 +474,12 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
 
             <div
               style={{
-                fontSize: 10.5,
+                fontSize: 12,
                 color: '#64748b',
                 background: '#fff',
                 border: '1px solid #e2e8f0',
                 borderRadius: 8,
-                padding: '7px 10px',
+                padding: '8px 12px',
                 lineHeight: 1.5,
               }}
             >
@@ -499,13 +499,13 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                     background: '#fff',
                     border: '1px solid #e2e8f0',
                     borderRadius: 8,
-                    padding: '8px 10px',
+                    padding: '10px 12px',
                   }}
                 >
-                  <div style={{ fontWeight: 600, fontSize: 12, color: '#1e293b', marginBottom: 4 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', marginBottom: 5 }}>
                     {faq.q}
                   </div>
-                  <div style={{ fontSize: 11.5, color: '#475569', lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.55 }}>
                     {faq.a}
                   </div>
                 </div>
