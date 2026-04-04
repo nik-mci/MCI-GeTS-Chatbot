@@ -243,16 +243,20 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
               }}
             >
               <div style={{ fontSize: 10, fontWeight: 600, color: '#1a4a3a', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
-                Estimated price
+                Pricing
               </div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: '#1a4a3a' }}>
-                {data.priceCurrency}{data.priceFrom.toLocaleString()} – {data.priceCurrency}{data.priceTo.toLocaleString()}
-              </div>
-              <div style={{ fontSize: 10.5, color: '#2d7a56', marginTop: 2 }}>
-                {data.priceUnit}
-              </div>
+              {data.priceFrom > 0 && data.priceTo > 0 ? (
+                <>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1a4a3a' }}>
+                    {data.priceCurrency}{data.priceFrom.toLocaleString()} – {data.priceCurrency}{data.priceTo.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#2d7a56', marginTop: 2 }}>
+                    {data.priceUnit}
+                  </div>
+                </>
+              ) : null}
               {data.priceNote && (
-                <div style={{ fontSize: 10, color: '#64748b', marginTop: 5, lineHeight: 1.45 }}>
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: data.priceFrom > 0 ? 5 : 0, lineHeight: 1.45 }}>
                   {data.priceNote}
                 </div>
               )}

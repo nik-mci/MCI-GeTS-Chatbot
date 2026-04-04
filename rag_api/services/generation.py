@@ -185,6 +185,8 @@ ITINERARY CARD — DATA RULES
 - dailyPlan: always include at least 2 day blocks, max 7
 - faqs: always include at least 2, max 4
 - expert: always use initials "GT", name "GeTS Team", role "India Travel Specialist", years 15
+- proofQuote: ALWAYS set to "" (empty string) — never fabricate a testimonial
+- proofOrigin: ALWAYS set to "" (empty string) — never fabricate a traveller origin
 
 ════════════════════════════════════════
 MARKET-AWARE BEHAVIOUR
@@ -247,6 +249,11 @@ GUARDRAILS
 - NEVER open a response with an apology or excuse — start directly with the helpful content
 - NEVER use filler openers like "Of course!", "Certainly!", "Great question!",
   "Sure thing!", "Absolutely!", "Happy to help!" — begin with the substance
+- NEVER generate a second itinerary card if one has already been shown this session.
+  Answer questions about the existing card instead.
+- At CONVERSION or HANDOFF stage, NEVER list GeTS phone numbers or email in the response
+  body. A contact strip is already visible to the user. Your job at CONVERSION is to ask
+  for the user's name and contact — not to hand out ours.
 
 ════════════════════════════════════════
 CLOSING
@@ -265,18 +272,27 @@ _STAGE_GUIDANCE = {
     "value": (
         "CURRENT STAGE: VALUE — Destination is known. "
         "Deliver itinerary content, micro-expertise cues, or a pricing band. "
-        "Trigger the itinerary card if destination and rough duration are known. "
+        "Trigger the itinerary card ONCE if destination and rough duration are known — "
+        "but only if a card has NOT already been shown. "
         "Do NOT ask for contact details yet."
     ),
     "conversion": (
-        "CURRENT STAGE: CONVERSION — Real value has been delivered and the user is engaged. "
-        "This is the right moment to use the exact lead capture script from your instructions "
-        "and ask for name and contact details."
+        "CURRENT STAGE: CONVERSION — An itinerary card has already been shown. "
+        "Your ONLY job now is to use the EXACT lead capture script from LEAD CAPTURE — HOW TO ASK "
+        "and collect the user's name and contact details. "
+        "STRICT RULES FOR THIS STAGE: "
+        "(1) Do NOT generate another itinerary card under any circumstances. "
+        "(2) Do NOT list GeTS phone numbers or email — the user can already see the contact strip. "
+        "(3) Do NOT answer new travel questions — acknowledge warmly, then redirect to the contact ask. "
+        "(4) Use the verbatim wording from LEAD CAPTURE — HOW TO ASK. "
+        "The goal is a name and a phone number or email from the user, nothing else."
     ),
     "handoff": (
         "CURRENT STAGE: HANDOFF — Contact details have already been requested this session. "
-        "Continue the conversation warmly and helpfully. "
-        "Do NOT ask for contact details again."
+        "Continue the conversation warmly and helpfully — answer any remaining questions. "
+        "Do NOT ask for contact details again. "
+        "Do NOT generate another itinerary card. "
+        "Do NOT list GeTS phone numbers or email in your response body."
     ),
 }
 
@@ -294,8 +310,8 @@ def _detect_stage(conversation_history: List[Dict[str, str]], ranked_docs: List[
     if any(signal in m.lower() for m in bot_messages for signal in handoff_signals):
         return "handoff"
 
-    # CONVERSION: card was shown (reliable signal from frontend) and conversation is substantive
-    if card_shown and msg_count >= 4:
+    # CONVERSION: card was shown (reliable signal from frontend) — trigger on next user message
+    if card_shown and msg_count >= 2:
         return "conversion"
 
     # VALUE: retrieval found relevant docs and conversation is underway
@@ -354,10 +370,21 @@ def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_hi
     stage = _detect_stage(conversation_history, ranked_docs, card_shown)
     stage_line = _STAGE_GUIDANCE[stage]
 
+    # SR5 — Confidence gate: no retrieved docs means no grounded card is possible
+    no_context_warning = ""
+    if not ranked_docs:
+        no_context_warning = (
+            "\n⚠️ RETRIEVAL WARNING: No relevant knowledge base content was found for this query. "
+            "Do NOT generate an itinerary card — you have no grounded data to populate it with. "
+            "Do NOT invent hotel names, daily plans, or prices. "
+            "If the user is asking for an itinerary or travel plan, respond warmly that our specialists "
+            "will build a fully personalised plan and pivot to the lead capture ask.\n"
+        )
+
     from datetime import date
     today = date.today().strftime("%d %B %Y")
 
-    return f"TODAY'S DATE: {today}\n\nCONTEXT FROM KNOWLEDGE BASE:\n{context_text}\n\nCONVERSATION SO FAR:\n{history_text}\n\n{stage_line}\n\nCURRENT USER MESSAGE:\n{query}"
+    return f"TODAY'S DATE: {today}\n\nCONTEXT FROM KNOWLEDGE BASE:\n{context_text}{no_context_warning}\n\nCONVERSATION SO FAR:\n{history_text}\n\n{stage_line}\n\nCURRENT USER MESSAGE:\n{query}"
 
 async def generate_response(
     query: str,

@@ -629,9 +629,18 @@ export default function ChatWidget() {
                   <a
                     href="tel:+919910903434"
                     className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-[#CC0000] hover:bg-[#CC0000] transition-all group"
+                    title="+91 99109 03434"
                   >
                     <Phone size={13} className="text-[#CC0000] group-hover:text-white transition-colors" />
-                    <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Mobile</span>
+                    <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Call 1</span>
+                  </a>
+                  <a
+                    href="tel:+919910903535"
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded border border-[#CC0000] hover:bg-[#CC0000] transition-all group"
+                    title="+91 99109 03535"
+                  >
+                    <Phone size={13} className="text-[#CC0000] group-hover:text-white transition-colors" />
+                    <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Call 2</span>
                   </a>
                   <a
                     href={`https://wa.me/${WHATSAPP_NUMBER}`}
