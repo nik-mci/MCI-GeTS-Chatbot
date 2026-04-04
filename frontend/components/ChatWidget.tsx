@@ -86,7 +86,7 @@ function getContextualReplies(
   if (/hotel|stay|accommodation|tier|luxury|budget|standard/.test(lower)) {
     return ['Budget (3★)', 'Standard (4★)', 'Luxury (5★)', 'Mix of tiers'];
   }
-  if (/who|group|travel with|party|travell|couple|family|solo|friends/.test(lower)) {
+  if (!accumulatedIntent.group_size && /who|group|travel with|party|travell|couple|family|solo|friends/.test(lower)) {
     return ['Just the two of us 💑', 'Family with kids 👨‍👩‍👧', 'Friends group 👥', 'Solo 🧳'];
   }
 
@@ -439,14 +439,21 @@ export default function ChatWidget() {
         };
       });
 
+    let leadSaved = false;
     try {
-      await fetch(`${apiBaseUrl}/lead`, {
+      const res = await fetch(`${apiBaseUrl}/lead`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, contact, conversation_summary: summary, conversation_history: history }),
       });
+      leadSaved = res.ok;
     } catch {
-      // submission error is shown in LeadForm — don't block the confirmation
+      leadSaved = false;
+    }
+
+    if (!leadSaved) {
+      // Surface the error through LeadForm — throw so LeadForm shows its error state
+      throw new Error('Lead save failed');
     }
 
     setLeadCaptured(true);
@@ -622,8 +629,10 @@ export default function ChatWidget() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* CTA Strip — shown after bot has sent its second response */}
-            {messages.filter(m => m.sender === 'bot').length >= 2 && (
+            {/* CTA Strip — shown only when stage is value/conversion/handoff AND
+                we have at least a destination or group size (user is meaningfully engaged) */}
+            {['value', 'conversion', 'handoff'].includes(currentStage) &&
+             (accumulatedIntent.destinations.length > 0 || !!accumulatedIntent.group_size) && (
               <div className="px-3 pt-2.5 pb-2 bg-white border-t border-slate-100 flex-shrink-0">
                 <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-widest text-center mb-2">
                   Talk to our travel experts

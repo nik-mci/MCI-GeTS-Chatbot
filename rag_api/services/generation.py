@@ -131,9 +131,9 @@ Format:
   "attractions": <integer>,
   "hotelTier": "4★",
   "weather": [
-    { "day": "Mon 6", "icon": "sunny", "low": 24, "high": 32 },
-    { "day": "Tue 7", "icon": "cloudy", "low": 23, "high": 30 },
-    { "day": "Wed 8", "icon": "sunny", "low": 24, "high": 31 }
+    { "season": "Oct – Mar", "icon": "sunny", "low": 18, "high": 28, "note": "Best time — cool and dry" },
+    { "season": "Apr – Jun", "icon": "cloudy", "low": 26, "high": 38, "note": "Hot; fewer crowds" },
+    { "season": "Jul – Sep", "icon": "rain", "low": 22, "high": 30, "note": "Monsoon season" }
   ],
   "priceFrom": <integer>,
   "priceTo": <integer>,
@@ -284,7 +284,7 @@ _STAGE_GUIDANCE = {
         "STRICT RULES FOR THIS STAGE: "
         "(1) Do NOT generate another itinerary card under any circumstances. "
         "(2) Do NOT list GeTS phone numbers or email — the user can already see the contact strip. "
-        "(3) Do NOT answer new travel questions — acknowledge warmly, then redirect to the contact ask. "
+        "(3) If the user asks a specific travel question, answer it in one sentence, then immediately pivot to the contact ask. "
         "(4) Use the verbatim wording from LEAD CAPTURE — HOW TO ASK. "
         "The goal is a name and a phone number or email from the user, nothing else."
     ),

@@ -5,10 +5,13 @@ import React, { useState } from 'react';
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface WeatherDay {
-  day: string;
+  season: string;
   icon: 'sunny' | 'cloudy' | 'rain' | string;
   low: number;
   high: number;
+  note: string;
+  // legacy fields — kept for backwards compat with any cached cards
+  day?: string;
 }
 
 interface DayItem {
@@ -199,7 +202,7 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
               ))}
             </div>
 
-            {/* Weather */}
+            {/* Seasonal weather guide */}
             {data.weather && data.weather.length > 0 && (
               <div
                 style={{
@@ -210,7 +213,7 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                 }}
               >
                 <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                  Weather forecast
+                  Seasonal guide
                 </div>
                 {data.weather.map((w, i) => (
                   <div
@@ -218,15 +221,22 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '3px 0',
+                      gap: 8,
+                      padding: '4px 0',
                       borderTop: i > 0 ? '1px solid #f1f5f9' : 'none',
                     }}
                   >
-                    <span style={{ fontSize: 11, color: '#475569', width: 52 }}>{w.day}</span>
-                    <span style={{ fontSize: 14 }}>{weatherIcon(w.icon)}</span>
-                    <span style={{ fontSize: 11, color: '#64748b' }}>
-                      {w.low}° – {w.high}°C
+                    <span style={{ fontSize: 14, flexShrink: 0 }}>{weatherIcon(w.icon)}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#334155' }}>
+                        {w.season}
+                      </div>
+                      {w.note && (
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>{w.note}</div>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 10.5, color: '#64748b', flexShrink: 0 }}>
+                      {w.low}°–{w.high}°C
                     </span>
                   </div>
                 ))}

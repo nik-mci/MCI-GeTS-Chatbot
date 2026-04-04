@@ -31,21 +31,23 @@ class Settings(BaseSettings):
 
     # Data Quality
     KNOWN_DESTINATIONS: list = [
-        # Regional/State (India)
-        "kerala", "rajasthan", "goa", "kashmir", "ladakh", "himachal", "uttarakhand",
-        "sikkim", "assam", "meghalaya", "arunachal", "nagaland", "manipur", "mizoram", "tripura",
-        "karnataka", "tamil nadu", "andhra pradesh", "telangana", "gujarat", "maharashtra", 
-        "west bengal", "odisha", "punjab", "haryana", "uttar pradesh", "madhya pradesh", "andaman",
-        "north india", "south india", "east india", "west india", "central india", "north east", "northeast",
-        
-        # Cities & Key Landmarks
-        "delhi", "agra", "jaipur", "jodhpur", "udaipur", "pushkar", "ranthambore", "varanasi", 
-        "rishikesh", "mathura", "vrindavan", "orchha", "khajuraho", "mumbai", "amritsar", 
-        "hampi", "kaziranga", "leh", "dharamshala", "golden triangle",
-        
-        # International
-        "bhutan", "nepal", "sri lanka", "bali", "dubai", "maldives", "switzerland", "thailand", "europe",
-        "vietnam", "cambodia", "laos", "turkey", "egypt", "greece"
+        # Indian Regions & States (verified from getsholidays.com)
+        "kerala", "rajasthan", "goa", "kashmir", "ladakh", "himachal", "himachal pradesh",
+        "uttarakhand", "assam", "meghalaya", "arunachal", "arunachal pradesh",
+        "karnataka", "tamil nadu", "gujarat", "maharashtra", "odisha",
+        "punjab", "haryana", "madhya pradesh", "andaman",
+        "north india", "south india", "northeast", "north east",
+
+        # Cities & Key Landmarks (verified from getsholidays.com)
+        "delhi", "agra", "jaipur", "jodhpur", "udaipur", "jaisalmer", "pushkar",
+        "ranthambore", "varanasi", "haridwar", "rishikesh", "amritsar",
+        "manali", "leh", "nubra valley", "pangong", "dharamshala",
+        "mumbai", "goa", "kochi", "munnar", "rameshwaram", "madurai",
+        "bangalore", "chennai", "orchha", "khajuraho", "hampi", "kaziranga",
+        "golden triangle",
+
+        # International (verified from getsholidays.com — India, Nepal, Bhutan, Sri Lanka only)
+        "bhutan", "nepal", "sri lanka",
     ]
     
     BAD_PATTERNS: list = [
@@ -95,7 +97,6 @@ class Settings(BaseSettings):
         "price", "cost", "inclusion", "exclusion",
         "hotel", "flight", "transfer", "stay",
         "destination", "tour", "trip", "budget",
-        "bali", "maldives", "dubai", "switzerland", "thailand", "europe",
         "visa", "guide", "activities", "resort", "villa"
     ]
     
