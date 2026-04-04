@@ -513,8 +513,11 @@ export default function ChatWidget() {
             className="fixed bottom-[80px] sm:bottom-[88px] right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-[460px] h-[calc(100dvh-100px)] sm:h-[680px] max-h-[860px] bg-white shadow-2xl flex flex-col z-[100] border border-slate-200 rounded-lg overflow-hidden"
           >
             {/* Header */}
-            <div className="bg-[#CC0000] px-4 py-2.5 flex items-center justify-between flex-shrink-0">
-              <h3 className="font-semibold text-[15px] text-white tracking-wide">GeTS AI Assistant</h3>
+            <div className="bg-[#CC0000] px-4 py-3 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <img src="/image.png" alt="GeTS" className="w-10 h-10 rounded-full object-cover border-2 border-white/30 shadow-md" />
+                <h3 className="font-extrabold text-[18px] text-white tracking-wide drop-shadow-sm">GeTS AI Assistant</h3>
+              </div>
               <div className="flex items-center gap-1">
                 <button
                   onClick={clearSession}
@@ -736,11 +739,6 @@ export default function ChatWidget() {
                 >
                   <Send size={19} />
                 </button>
-              </div>
-              <div className="mt-1.5 pt-1.5 border-t border-slate-100">
-                <p className="text-center text-[9px] text-slate-400 font-medium uppercase tracking-widest">
-                  ⚡ Powered by GeTS AI
-                </p>
               </div>
             </div>
           </motion.div>
