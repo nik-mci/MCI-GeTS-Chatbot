@@ -174,6 +174,12 @@ export default function ChatWidget() {
       }
     }
 
+    // Stream cut off mid-marker (token limit hit) — strip the dangling <<< fragment
+    const partialIdx = text.lastIndexOf('<<<');
+    if (partialIdx !== -1) {
+      return { cardData: null, cleanText: text.slice(0, partialIdx).trim(), cardLoading: false };
+    }
+
     return { cardData: null, cleanText: text, cardLoading: false };
   }
 
