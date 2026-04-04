@@ -2,7 +2,6 @@ import google.generativeai as genai
 from groq import Groq
 import logging
 import time
-import asyncio
 from config import settings
 from typing import List, Dict, Any
 
@@ -182,8 +181,10 @@ ITINERARY CARD — DATA RULES
 - If no pricing data exists for a destination, use: "priceFrom": 0, "priceTo": 0 
   and set "priceNote" to "Our team will provide exact pricing based on your dates and group size."
 - weather icons: use only "sunny", "cloudy", or "rain"
-- dailyPlan: always include at least 2 day blocks, max 7
-- faqs: always include at least 2, max 4
+- dailyPlan: include EXACTLY 2 day blocks as a teaser — never more, never fewer.
+  The full itinerary is prepared by the team after lead capture. Do not summarise
+  the remaining days inline — the card footer handles that message.
+- faqs: always include exactly 2, no more
 - expert: always use initials "GT", name "GeTS Team", role "India Travel Specialist", years 15
 - proofQuote: ALWAYS set to "" (empty string) — never fabricate a testimonial
 - proofOrigin: ALWAYS set to "" (empty string) — never fabricate a traveller origin
@@ -351,8 +352,8 @@ def _detect_stage(
 
 def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_history: List[Dict[str, str]], card_shown: bool = False) -> str:
     # --- Build context ---
-    TOP_K_CHUNKS = 10
-    MAX_WORDS_PER_CHUNK = 300
+    TOP_K_CHUNKS = 5       # was 10 — reduce if retrieval quality drops on niche queries
+    MAX_WORDS_PER_CHUNK = 200  # was 300
     context_text = "No relevant context found."
     
     if ranked_docs:

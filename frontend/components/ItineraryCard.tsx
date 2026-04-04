@@ -342,7 +342,7 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
         {activeTab === 'daily' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {data.dailyPlan && data.dailyPlan.length > 0 ? (
-              data.dailyPlan.map((dayBlock, i) => (
+              data.dailyPlan.slice(0, 2).map((dayBlock, i) => (
                 <div
                   key={i}
                   style={{
@@ -401,6 +401,19 @@ export default function ItineraryCard({ data }: { data: ItineraryCardData }) {
               <p style={{ margin: 0, color: '#94a3b8', fontSize: 12 }}>
                 No daily plan available.
               </p>
+            )}
+            {data.dailyPlan && data.dailyPlan.length > 0 && (
+              <div style={{
+                background: '#edf7f2',
+                border: '1px solid #b6dfc9',
+                borderRadius: 8,
+                padding: '10px 14px',
+                fontSize: 12.5,
+                color: '#1a4a3a',
+                lineHeight: 1.5,
+              }}>
+                🗓️ Your full {data.days}-day plan is prepared by our team based on your travel dates and preferences — share your details to receive it.
+              </div>
             )}
           </div>
         )}
