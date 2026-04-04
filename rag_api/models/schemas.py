@@ -7,6 +7,7 @@ class AccumulatedIntentPayload(BaseModel):
     budget: Optional[str] = None
     travel_date: Optional[str] = None
     theme: Optional[str] = None
+    group_size: Optional[str] = None
 
 class ChatRequest(BaseModel):
     query: str
@@ -23,6 +24,7 @@ class IntentExtraction(BaseModel):
     intent: str = "general" # pricing, booking, itinerary, general
     rewritten_query: str = "" # Optimized dense search format
     theme: Optional[str] = None # Theme extracted to help rewriting, optional
+    group_size: Optional[str] = None # e.g. "2 adults", "family of 4", "solo"
     stage: str = "discovery" # discovery, value, conversion, handoff
 
 class SourceDocument(BaseModel):

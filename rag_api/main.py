@@ -131,6 +131,8 @@ def _merge_accumulated_intent(intent_info, accumulated: AccumulatedIntentPayload
         intent_info.travel_date = accumulated.travel_date
     if not intent_info.theme and accumulated.theme:
         intent_info.theme = accumulated.theme
+    if not intent_info.group_size and accumulated.group_size:
+        intent_info.group_size = accumulated.group_size
     return intent_info
 
 LOG_FILE = "rag_log.jsonl"

@@ -36,6 +36,7 @@ async def extract_intent_and_entities(query: str, history: list = None) -> Inten
     - travel_date (string, e.g. "Next month", "December 2026")
     - intent (enum: pricing, booking, itinerary, general)
     - theme (string, optional: e.g. "Beach", "Honeymoon", "Adventure")
+    - group_size (string, optional: normalise to a short label — e.g. "Solo", "Couple", "Family of 4", "Group of 8". Extract from phrases like "just the two of us", "me and my wife", "family with 2 kids", "4 friends", "solo trip".)
     - rewritten_query (string) **MANDATORY**: A clean, dense, search-optimized representation of the user's intent to query the vector database.
     
     CRITICAL INSTRUCTION - REWRITTEN QUERY & THEMES:

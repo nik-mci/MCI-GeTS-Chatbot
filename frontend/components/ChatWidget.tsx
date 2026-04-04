@@ -27,6 +27,7 @@ interface AccumulatedIntent {
   budget: string | null;
   travel_date: string | null;
   theme: string | null;
+  group_size: string | null;
 }
 
 function mergeIntent(prev: AccumulatedIntent, incoming: Record<string, unknown>): AccumulatedIntent {
@@ -37,6 +38,7 @@ function mergeIntent(prev: AccumulatedIntent, incoming: Record<string, unknown>)
     budget: (incoming.budget as string | null) || prev.budget,
     travel_date: (incoming.travel_date as string | null) || prev.travel_date,
     theme: (incoming.theme as string | null) || prev.theme,
+    group_size: (incoming.group_size as string | null) || prev.group_size,
   };
 }
 
@@ -45,10 +47,11 @@ function formatHandoffSummary(intent: AccumulatedIntent): string {
   const rows: string[] = ['TRIP INTEREST SUMMARY', line];
   if (intent.destinations.length > 0)
     rows.push(`Destination : ${intent.destinations.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')}`);
-  if (intent.duration)   rows.push(`Duration    : ${intent.duration}`);
-  if (intent.budget)     rows.push(`Budget      : ${intent.budget}`);
+  if (intent.group_size)  rows.push(`Group size  : ${intent.group_size}`);
+  if (intent.duration)    rows.push(`Duration    : ${intent.duration}`);
+  if (intent.budget)      rows.push(`Budget      : ${intent.budget}`);
   if (intent.travel_date) rows.push(`Travel date : ${intent.travel_date}`);
-  if (intent.theme)      rows.push(`Theme/Type  : ${intent.theme}`);
+  if (intent.theme)       rows.push(`Theme/Type  : ${intent.theme}`);
   if (rows.length === 2) rows.push('No specific trip details captured.');
   rows.push(line);
   return rows.join('\n');
@@ -141,7 +144,7 @@ export default function ChatWidget() {
   const [sessionId, setSessionId] = useState<string>('');
   const [currentStage, setCurrentStage] = useState<string>('discovery');
   const [accumulatedIntent, setAccumulatedIntent] = useState<AccumulatedIntent>({
-    destinations: [], duration: null, budget: null, travel_date: null, theme: null,
+    destinations: [], duration: null, budget: null, travel_date: null, theme: null, group_size: null,
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -386,7 +389,7 @@ export default function ChatWidget() {
     localStorage.removeItem(SESSION_LEAD_KEY);
     localStorage.removeItem(SESSION_INTENT_KEY);
     localStorage.removeItem(SESSION_STAGE_KEY);
-    setAccumulatedIntent({ destinations: [], duration: null, budget: null, travel_date: null, theme: null });
+    setAccumulatedIntent({ destinations: [], duration: null, budget: null, travel_date: null, theme: null, group_size: null });
     setCurrentStage('discovery');
     setMessages([]);
     setLeadCaptured(false);
