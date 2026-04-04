@@ -43,7 +43,9 @@
       "Bash(curl -s -X POST http://localhost:8001/chat -H 'Content-Type: application/json' -d '{\"query\": \"What about the Golden Triangle tour?\", \"conversation_history\": [{\"role\": \"user\", \"content\": \"We are a family of 4 looking for a 10-day India trip\"}, {\"role\": \"assistant\", \"content\": \"Great! For a family of 4, I recommend the Golden Triangle with Rajasthan.\"}]}' --max-time 40)",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Answer:', d['answer'][:400]\\); print\\('Destination detected:', d['metadata']['destination']\\); print\\('Confidence:', d['confidence']\\)\")",
       "Bash(echo \"PID: $!\")",
-      "Bash(curl -s --max-time 5 http://localhost:8000/health)"
+      "Bash(curl -s --max-time 5 http://localhost:8000/health)",
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:www.getsholidays.com)"
     ]
   }
 }
