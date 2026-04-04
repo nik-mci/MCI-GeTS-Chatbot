@@ -534,8 +534,10 @@ export default function ChatWidget() {
                 const lastBotMsg = [...messages].reverse().find(m => m.sender === 'bot');
                 const lastBotId = lastBotMsg?.id;
                 const lastBotText = lastBotMsg?.text ?? '';
+                // Suppress contextual replies when a lead form is visible and unanswered
+                const formPending = messages.some(m => m.showLeadForm) && !leadCaptured;
                 // Don't show contextual replies on the welcome message — INITIAL_QUICK_REPLIES handles that state
-                const contextualReplies = !isLoading && lastBotId && messages.length > 1
+                const contextualReplies = !isLoading && lastBotId && messages.length > 1 && !formPending
                   ? getContextualReplies(currentStage, accumulatedIntent, lastBotText)
                   : [];
                 return messages.map((msg) => {
