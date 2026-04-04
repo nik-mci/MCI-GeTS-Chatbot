@@ -23,6 +23,7 @@ class IntentExtraction(BaseModel):
     intent: str = "general" # pricing, booking, itinerary, general
     rewritten_query: str = "" # Optimized dense search format
     theme: Optional[str] = None # Theme extracted to help rewriting, optional
+    stage: str = "discovery" # discovery, value, conversion, handoff
 
 class SourceDocument(BaseModel):
     content: str

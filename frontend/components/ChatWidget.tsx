@@ -18,6 +18,7 @@ const SESSION_MESSAGES_KEY = 'gets_messages';
 const SESSION_TIMESTAMP_KEY = 'gets_session_timestamp';
 const SESSION_LEAD_KEY = 'gets_lead_captured';
 const SESSION_INTENT_KEY = 'gets_intent';
+const SESSION_STAGE_KEY = 'gets_stage';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface AccumulatedIntent {
@@ -57,13 +58,51 @@ function generateSessionId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-const QUICK_REPLIES = [
+const INITIAL_QUICK_REPLIES = [
   "A romantic trip 🏰",
   "For a family trip 👨‍👩‍👧",
   "For a trip with my friends 👥",
   "For a solo trip 🧳",
   "Group Tour 🚢",
 ];
+
+function getContextualReplies(
+  stage: string,
+  accumulatedIntent: AccumulatedIntent,
+  lastBotMessage: string
+): string[] {
+  // Keyword overrides: bot's last message drives the next options
+  const lower = lastBotMessage.toLowerCase();
+
+  if (/month|season|when|time of year|monsoon|weather|best time/.test(lower)) {
+    return ['Oct–Nov (cool & dry)', 'Dec–Feb (winter sun)', 'Mar–Apr (spring)', 'Jul–Aug (monsoon)'];
+  }
+  if (/how many days|how long|duration|nights|week|days do/.test(lower)) {
+    return ['5–7 days', '8–10 days', '10–14 days', 'More than 2 weeks'];
+  }
+  if (/hotel|stay|accommodation|tier|luxury|budget|standard/.test(lower)) {
+    return ['Budget (3★)', 'Standard (4★)', 'Luxury (5★)', 'Mix of tiers'];
+  }
+  if (/who|group|travel with|party|travell|couple|family|solo|friends/.test(lower)) {
+    return ['Just the two of us 💑', 'Family with kids 👨‍👩‍👧', 'Friends group 👥', 'Solo 🧳'];
+  }
+
+  // Stage-based fallbacks
+  if (stage === 'discovery' && accumulatedIntent.destinations.length === 0) {
+    return ['Kerala 🌴', 'Rajasthan 🏰', 'Bhutan 🏔️', 'Golden Triangle'];
+  }
+  if (stage === 'discovery') {
+    return ['Show me an itinerary', 'What are the highlights?', 'Best time to visit', 'What does it cost?'];
+  }
+  if (stage === 'value') {
+    return ['Show me an itinerary', 'What does it cost?', 'How long should we go for?', 'Best time to visit'];
+  }
+  if (stage === 'conversion') {
+    return ['Get a personalised quote', 'Customise this for us', 'Call us now', 'Tell me more first'];
+  }
+
+  return []; // handoff stage — no quick replies
+}
 
 // TODO: Replace with confirmed GeTS WhatsApp number when available
 const WHATSAPP_NUMBER = '919910903434';
@@ -100,6 +139,7 @@ export default function ChatWidget() {
   const [notificationCount, setNotificationCount] = useState(1);
   const [leadCaptured, setLeadCaptured] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
+  const [currentStage, setCurrentStage] = useState<string>('discovery');
   const [accumulatedIntent, setAccumulatedIntent] = useState<AccumulatedIntent>({
     destinations: [], duration: null, budget: null, travel_date: null, theme: null,
   });
@@ -151,6 +191,8 @@ export default function ChatWidget() {
         setSessionId(generateSessionId());
         const savedIntent = localStorage.getItem(SESSION_INTENT_KEY);
         if (savedIntent) setAccumulatedIntent(JSON.parse(savedIntent));
+        const savedStage = localStorage.getItem(SESSION_STAGE_KEY);
+        if (savedStage) setCurrentStage(savedStage);
         return;
       }
     }
@@ -168,14 +210,15 @@ export default function ChatWidget() {
     }, 1000);
   }, []);
 
-  // Persist messages, lead state, and accumulated intent to localStorage after every change
+  // Persist messages, lead state, accumulated intent, and stage to localStorage after every change
   useEffect(() => {
     if (messages.length === 0) return;
     localStorage.setItem(SESSION_MESSAGES_KEY, JSON.stringify(messages));
     localStorage.setItem(SESSION_TIMESTAMP_KEY, Date.now().toString());
     localStorage.setItem(SESSION_LEAD_KEY, String(leadCaptured));
     localStorage.setItem(SESSION_INTENT_KEY, JSON.stringify(accumulatedIntent));
-  }, [messages, leadCaptured, accumulatedIntent]);
+    localStorage.setItem(SESSION_STAGE_KEY, currentStage);
+  }, [messages, leadCaptured, accumulatedIntent, currentStage]);
 
   useEffect(() => {
     scrollToBottom();
@@ -270,6 +313,7 @@ export default function ChatWidget() {
             try {
               const intent = JSON.parse(token.slice(8));
               setAccumulatedIntent(prev => mergeIntent(prev, intent));
+              if (intent.stage) setCurrentStage(intent.stage);
             } catch { /* malformed intent — skip silently */ }
             continue;
           }
@@ -341,7 +385,9 @@ export default function ChatWidget() {
     localStorage.removeItem(SESSION_TIMESTAMP_KEY);
     localStorage.removeItem(SESSION_LEAD_KEY);
     localStorage.removeItem(SESSION_INTENT_KEY);
+    localStorage.removeItem(SESSION_STAGE_KEY);
     setAccumulatedIntent({ destinations: [], duration: null, budget: null, travel_date: null, theme: null });
+    setCurrentStage('discovery');
     setMessages([]);
     setLeadCaptured(false);
     setError(null);
@@ -448,7 +494,15 @@ export default function ChatWidget() {
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-[#f7f7f7] chat-scrollbar">
-              {messages.map((msg) => {
+              {(() => {
+                const lastBotMsg = [...messages].reverse().find(m => m.sender === 'bot');
+                const lastBotId = lastBotMsg?.id;
+                const lastBotText = lastBotMsg?.text ?? '';
+                // Don't show contextual replies on the welcome message — INITIAL_QUICK_REPLIES handles that state
+                const contextualReplies = !isLoading && lastBotId && messages.length > 1
+                  ? getContextualReplies(currentStage, accumulatedIntent, lastBotText)
+                  : [];
+                return messages.map((msg) => {
                 if (msg.sender === 'bot') {
                   const { cardData, cleanText, cardLoading } = parseItineraryCard(msg.text);
                   return (
@@ -480,6 +534,21 @@ export default function ChatWidget() {
                         {msg.showLeadForm && !leadCaptured && (
                           <LeadForm onSubmit={handleLeadSubmit} />
                         )}
+                        {/* Contextual quick replies — shown only below the last bot message */}
+                        {msg.id === lastBotId && contextualReplies.length > 0 && (
+                          <div className="flex flex-col gap-1.5 mt-2 w-full">
+                            {contextualReplies.map((reply) => (
+                              <button
+                                key={reply}
+                                onClick={() => handleSend(reply)}
+                                className="w-full py-2 px-3 border border-[#CC0000] text-[#CC0000] text-[12px] hover:bg-[#CC0000] hover:text-white transition-all bg-white text-left"
+                                style={{ borderRadius: 4 }}
+                              >
+                                {reply}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                         <span className="text-[10px] text-slate-400 mt-1 ml-0.5">
                           {formatTimestamp(msg.timestamp)}
                         </span>
@@ -502,7 +571,8 @@ export default function ChatWidget() {
                     </div>
                   </div>
                 );
-              })}
+              });
+              })()}
 
               {isLoading && (
                 <div className="flex items-start gap-2.5">
@@ -527,13 +597,13 @@ export default function ChatWidget() {
                 </div>
               )}
 
-              {/* Quick Replies — vertical stack, shown after welcome message only */}
+              {/* Welcome quick replies — shown only on the very first message, uses a fixed set */}
               {messages.length === 1 && !isLoading && (
                 <div className="flex flex-col gap-2 mt-1 ml-10">
                   <p className="text-[11px] text-slate-500 italic mb-0.5">
                     What type of trip are you planning?
                   </p>
-                  {QUICK_REPLIES.map((reply) => (
+                  {INITIAL_QUICK_REPLIES.map((reply) => (
                     <button
                       key={reply}
                       onClick={() => handleSend(reply)}
@@ -563,7 +633,7 @@ export default function ChatWidget() {
                     <Phone size={13} className="text-[#CC0000] group-hover:text-white transition-colors" />
                     <span className="text-[10px] font-semibold text-[#CC0000] group-hover:text-white transition-colors">Mobile</span>
                   </a>
-                  <
+                  <a
                     href={`https://wa.me/${WHATSAPP_NUMBER}`}
                     target="_blank"
                     rel="noopener noreferrer"
