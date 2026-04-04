@@ -371,7 +371,7 @@ async def chat_stream_endpoint(request: ChatRequest):
 
             # Emit structured intent metadata so the frontend can accumulate a handoff summary
             try:
-                intent_info.stage = _detect_stage(conversation_history, ranked_docs, request.card_shown)
+                intent_info.stage = _detect_stage(conversation_history, ranked_docs, request.card_shown, current_query=request.query)
                 yield f"data: [INTENT]{intent_info.model_dump_json()}\n\n"
             except Exception:
                 pass  # Never block the stream for metadata

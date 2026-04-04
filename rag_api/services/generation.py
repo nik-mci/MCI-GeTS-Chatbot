@@ -206,13 +206,17 @@ If pricing context is present, you may reference it as a starting point and note
 that final cost depends on group size, hotel tier, and travel dates.
 
 If NO pricing data is in the retrieved context, do NOT invent or estimate any number.
+This means: no ₹ ranges, no $ ranges, no "typically costs", no "usually around",
+no "can range from X to Y" — none of it. If you cannot point to a specific number
+in the CONTEXT FROM KNOWLEDGE BASE, you do not have permission to quote one.
+
+If the itinerary card showed "Our team will provide exact pricing" — that is your
+signal that no pricing data exists. Do NOT contradict the card by quoting a range.
+
 Instead, use this pivot to lead capture:
 "Pricing depends on your group size, hotel level, and travel dates — our team
 puts together personalised quotes quickly. Could we get your name and the best
 number to reach you? We'll have a breakdown sent across within a few hours."
-
-Never say "trips like this typically range from X to Y" unless X and Y come
-directly from the retrieved context.
 
 ════════════════════════════════════════
 RESPONSE FORMAT
@@ -249,6 +253,10 @@ GUARDRAILS
 - NEVER open a response with an apology or excuse — start directly with the helpful content
 - NEVER use filler openers like "Of course!", "Certainly!", "Great question!",
   "Sure thing!", "Absolutely!", "Happy to help!" — begin with the substance
+- NEVER generate an itinerary card unless the user has provided BOTH a destination AND
+  a rough duration (days, nights, or weeks), OR has explicitly requested one using words
+  like "show me", "can you plan", "itinerary", "day by day", "what would X days look like".
+  A destination alone is never sufficient to trigger a card.
 - NEVER generate a second itinerary card for the same destination if one has already
   been shown. Answer questions about the existing card instead. If the user asks to see
   a different destination, you may generate a new card for that destination.
@@ -297,8 +305,23 @@ _STAGE_GUIDANCE = {
     ),
 }
 
-def _detect_stage(conversation_history: List[Dict[str, str]], ranked_docs: List[Dict[str, Any]], card_shown: bool = False) -> str:
-    """Rule-based stage detection from conversation history."""
+_BUYING_SIGNALS = [
+    "how much", "what does it cost", "what's the cost", "what is the cost",
+    "cost for us", "price for us", "what would it cost", "what's the price",
+    "how do we book", "how do i book", "can we book", "ready to book",
+    "this looks great", "this is great", "sounds perfect", "sounds good",
+    "love this", "love it", "looks great", "let's do this", "lets do this",
+    "put together a quote", "get a quote", "personalised quote", "personalized quote",
+    "what's included", "what is included", "what's next", "what do we do next",
+]
+
+def _detect_stage(
+    conversation_history: List[Dict[str, str]],
+    ranked_docs: List[Dict[str, Any]],
+    card_shown: bool = False,
+    current_query: str = "",
+) -> str:
+    """Rule-based stage detection from conversation history and current query."""
     bot_messages = [m.get("content", "") for m in conversation_history if m.get("role") == "assistant"]
     msg_count = len(conversation_history)
 
@@ -311,9 +334,12 @@ def _detect_stage(conversation_history: List[Dict[str, str]], ranked_docs: List[
     if any(signal in m.lower() for m in bot_messages for signal in handoff_signals):
         return "handoff"
 
-    # CONVERSION: card was shown and there has been substantive follow-up engagement
-    if card_shown and msg_count >= 4:
-        return "conversion"
+    # CONVERSION: card shown AND user is signalling buying intent OR conversation is very deep
+    if card_shown:
+        query_lower = current_query.lower()
+        has_buying_signal = any(signal in query_lower for signal in _BUYING_SIGNALS)
+        if has_buying_signal or msg_count >= 8:
+            return "conversion"
 
     # VALUE: retrieval found relevant docs and conversation is underway
     if ranked_docs and msg_count >= 2:
@@ -368,7 +394,7 @@ def _build_prompt(query: str, ranked_docs: List[Dict[str, Any]], conversation_hi
                 history_lines.append(f"{role}: {content}")
         history_text = "\n".join(history_lines)
 
-    stage = _detect_stage(conversation_history, ranked_docs, card_shown)
+    stage = _detect_stage(conversation_history, ranked_docs, card_shown, current_query=query)
     stage_line = _STAGE_GUIDANCE[stage]
 
     # SR5 — Confidence gate: no retrieved docs means no grounded card is possible

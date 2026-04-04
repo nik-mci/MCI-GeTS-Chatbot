@@ -146,6 +146,9 @@ export default function ChatWidget() {
   const [accumulatedIntent, setAccumulatedIntent] = useState<AccumulatedIntent>({
     destinations: [], duration: null, budget: null, travel_date: null, theme: null, group_size: null,
   });
+  // Track unanswered lead form — nudge once after 2 ignored messages
+  const [userMsgsSinceForm, setUserMsgsSinceForm] = useState(0);
+  const [nudgeSent, setNudgeSent] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   function parseItineraryCard(text: string): { cardData: ItineraryCardData | null; cleanText: string; cardLoading: boolean } {
@@ -245,6 +248,10 @@ export default function ChatWidget() {
       sender: 'user',
       timestamp: new Date(),
     };
+
+    // Track how many messages the user has sent since the lead form appeared unanswered
+    const formIsOpen = messages.some(m => m.showLeadForm) && !leadCaptured && !nudgeSent;
+    if (formIsOpen) setUserMsgsSinceForm(prev => prev + 1);
 
     setMessages(prev => [...prev, userMsg]);
     setInput('');
@@ -374,6 +381,23 @@ export default function ChatWidget() {
         setMessages(prev =>
           prev.map(m => m.id === botMsgId ? { ...m, showLeadForm: true } : m)
         );
+        // Reset counter whenever the form is (re)shown
+        setUserMsgsSinceForm(0);
+      }
+
+      // Nudge: if the form was shown earlier but ignored for 2+ messages, resurface it once
+      if (!leadCaptured && !nudgeSent && userMsgsSinceForm >= 2) {
+        setNudgeSent(true);
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 2).toString(),
+            text: "By the way — whenever you're ready, the form above is the quickest way to get a personalised quote from our team. It only takes a moment. 🌿",
+            sender: 'bot' as const,
+            timestamp: new Date(),
+            showLeadForm: true,
+          },
+        ]);
       }
 
     } catch (err) {
@@ -391,6 +415,8 @@ export default function ChatWidget() {
     localStorage.removeItem(SESSION_STAGE_KEY);
     setAccumulatedIntent({ destinations: [], duration: null, budget: null, travel_date: null, theme: null, group_size: null });
     setCurrentStage('discovery');
+    setUserMsgsSinceForm(0);
+    setNudgeSent(false);
     setMessages([]);
     setLeadCaptured(false);
     setError(null);
