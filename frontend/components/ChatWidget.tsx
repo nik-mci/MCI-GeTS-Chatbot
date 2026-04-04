@@ -557,15 +557,23 @@ export default function ChatWidget() {
                             ))}
                           </div>
                         )}
-                        {cardLoading && (
+                        {cardLoading && isLoading && (
                           <div
                             className="bg-white border border-slate-100 shadow-sm px-4 py-3 flex gap-1.5 items-center"
-                            style={{ borderRadius: 14, width: '100%', maxWidth: 320 }}
+                            style={{ borderRadius: 14, width: '100%', maxWidth: 400 }}
                           >
                             <div className="w-1.5 h-1.5 bg-slate-300 rounded-full dot-pulse" style={{ animationDelay: '0s' }} />
                             <div className="w-1.5 h-1.5 bg-slate-300 rounded-full dot-pulse" style={{ animationDelay: '0.2s' }} />
                             <div className="w-1.5 h-1.5 bg-slate-300 rounded-full dot-pulse" style={{ animationDelay: '0.4s' }} />
                             <span className="text-[11px] text-slate-400 ml-1">Building your itinerary…</span>
+                          </div>
+                        )}
+                        {cardLoading && !isLoading && (
+                          <div
+                            className="bg-red-50 border border-red-100 px-4 py-3 text-[13px] text-red-600"
+                            style={{ borderRadius: 8, width: '100%', maxWidth: 400 }}
+                          >
+                            The itinerary couldn't load fully — please try again.
                           </div>
                         )}
                         {cardData && <ItineraryCard data={cardData} />}

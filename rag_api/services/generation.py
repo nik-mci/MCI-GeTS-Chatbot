@@ -438,7 +438,7 @@ async def generate_response(
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.4,
-                max_tokens=1024,
+                max_tokens=2048,
             )
             
             response_text = response.choices[0].message.content.strip()
@@ -496,7 +496,7 @@ async def generate_response_stream(
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.4,
-                max_tokens=1024,
+                max_tokens=2048,
                 stream=True
             )
 
